@@ -1,2 +1,1 @@
-bin/webapi
-bin/pull_worker
+bin/*
