@@ -11,6 +11,8 @@ build-pullworker:
 build-scanworker:
 	go build -o ./bin/scan_worker ./cmd/scanworker
 
+k8s-webapi-portforward:
+	kubectl port-forward svc/webapi 8080:8080
 k8s-deploy:
 	kubectl apply -f k8s/registry/registry-deployment.yaml
 	kubectl apply -f k8s/registry/registry-service.yaml
