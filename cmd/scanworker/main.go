@@ -27,19 +27,21 @@ func main() {
 
 func processQueue() {
 	// Block until an image name is available in the 'toscan' queue
-	imageName, err := rdb.BRPop(ctx, 0, "toscan").Result()
+	redisAnswer, err := rdb.BRPop(ctx, 0, "toscan").Result()
 	if err != nil {
 		log.Println("Error:", err)
 		return
 	}
 
+	imageName := redisAnswer[1]
 	// Sanitize the image name to create a valid filename
-	safeImageName := strings.ReplaceAll(imageName[0], "/", "_")
+	safeImageName := strings.ReplaceAll(imageName, "/", "_")
 	safeImageName = strings.ReplaceAll(safeImageName, ":", "_")
 	resultFileName := "/app/reports/" + safeImageName + ".json"
 
-	// Run Trivy scan
-	cmd := exec.Command("trivy", "--format", "json", "--output", resultFileName, imageName[0])
+	log.Println("Scanning image:", imageName)
+	log.Println("Saving results to:", resultFileName)
+	cmd := exec.Command("trivy", "image", "--format", "json", "--output", resultFileName, imageName)
 	if err := cmd.Run(); err != nil {
 		log.Println("Failed to scan image:", imageName, "Error:", err)
 		return
