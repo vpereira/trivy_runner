@@ -40,10 +40,10 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
 
-  trivyscanner:
+  scanworker:
     build:
       context: .
-      dockerfile: Dockerfile-trivyworker
+      dockerfile: Dockerfile-scanworker
     networks:
       - trivy-net
     volumes:
