@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pullworker
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: pullworker
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.service: pullworker
+    spec:
+      containers:
+        - env:
+            - name: REDIS_HOST
+              value: redis
+            - name: REDIS_PORT
+              value: "6379"
+          image: localhost:5000/trivy_runner_pullworker:latest
+          name: pullworker
+      restartPolicy: Always
+      volumes:
+        - name: shared-reports-volume
+          persistentVolumeClaim:
+            claimName: shared-reports-claim

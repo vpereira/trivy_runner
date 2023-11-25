@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+    networks:
+      - trivy-net
+
+  webapi:
+    build:
+      context: .
+      dockerfile: Dockerfile-webapi
+    ports:
+      - "8080:8080"
+    networks:
+      - trivy-net
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./trivy-reports:/app/reports
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  pullworker:
+    build:
+      context: .
+      dockerfile: Dockerfile-pullworker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./trivy-reports:/app/reports
+    networks:
+      - trivy-net
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  scanworker:
+    build:
+      context: .
+      dockerfile: Dockerfile-scanworker
+    networks:
+      - trivy-net
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./trivy-reports:/app/reports
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+networks:
+  trivy-net:
+    driver: bridge
+

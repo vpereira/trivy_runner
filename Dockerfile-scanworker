@@ -1,0 +1,23 @@
+# Similar structure to Dockerfile-webapi
+FROM golang:1.19 as builder
+
+WORKDIR /app
+
+COPY go.* ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o scanworker ./cmd/scanworker
+
+FROM alpine:latest
+RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
+RUN apk --no-cache add ca-certificates
+RUN apk add trivy@testing
+
+WORKDIR /root/
+
+COPY --from=builder /app/scanworker .
+
+CMD ["./scanworker"]
+

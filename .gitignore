@@ -1,1 +1,2 @@
-trivy_runner
+bin/*
+trivy-reports/*.json
