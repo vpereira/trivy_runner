@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"os/exec"
 
 	"github.com/go-redis/redis/v8"
@@ -12,10 +13,23 @@ var ctx = context.Background()
 var rdb *redis.Client
 
 func main() {
+	redisHost := os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		redisHost = "localhost" // Default value if not set
+	}
+
+	redisPort := os.Getenv("REDIS_PORT")
+	if redisPort == "" {
+		redisPort = "6379" // Default value if not set
+	}
+
+	redisURL := redisHost + ":" + redisPort
+	log.Println("Connecting to Redis at:", redisURL)
+
 	rdb = redis.NewClient(&redis.Options{
-		Addr:     "redis:6379", // Update with your Redis address
-		Password: "",           // No password set
-		DB:       0,            // Default DB
+		Addr:     redisURL, // Update with your Redis address
+		Password: "",       // No password set
+		DB:       0,        // Default DB
 	})
 
 	// Start processing loop

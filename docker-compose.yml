@@ -21,6 +21,9 @@ services:
       - ./trivy-reports:/app/reports
     depends_on:
       - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
 
   pullworker:
     build:
@@ -33,6 +36,9 @@ services:
       - trivy-net
     depends_on:
       - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
 
   trivyscanner:
     build:
@@ -45,7 +51,9 @@ services:
       - ./trivy-reports:/app/reports
     depends_on:
       - redis
-
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
 
 networks:
   trivy-net:
