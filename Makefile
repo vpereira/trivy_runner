@@ -11,4 +11,7 @@ build-pullworker:
 build-scanworker:
 	go build -o ./bin/scan_worker ./cmd/scanworker
 
+lint:
+	docker run --rm -v "$(CURDIR):/app" -w /app golangci/golangci-lint:v1.55.2 golangci-lint run -v
+
 
