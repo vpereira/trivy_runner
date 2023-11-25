@@ -110,17 +110,17 @@ make k8s-push-images
    make k8s-build-images
    make k8s-tag-images
    ```
-
-2. Push the images to the local Docker registry:
-
-   ```bash
-   make k8s-push-images
-   ```
-
-3. Deploy the application components to your Kubernetes cluster:
+   
+2. Deploy the application components to your Kubernetes cluster:
 
    ```bash
    make k8s-deploy
+   ```
+
+3. Push the images to the local Docker registry:
+
+   ```bash
+   make k8s-push-images
    ```
 
 
