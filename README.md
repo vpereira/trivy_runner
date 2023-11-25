@@ -26,19 +26,20 @@ To set up the Trivy Runner on your local machine, follow these steps:
    go build -o trivy_runner ./cmd/trivy_runner
    ```
 
-### Usage
+## Usage
 
-To run the Trivy Runner application:
+`docker-compose build` # to build it
 
-```
-./trivy_runner
-```
+`docker-compose up` # to start it
 
-The server starts on port 8080 by default. To scan a Docker image, send a request to `/scan` with the `image` parameter:
+Then if you want to scan a new image:
 
-```
-curl "http://localhost:8080/scan?image=registry.suse.com/bci/bci-image:latest"
-```
+curl "http://localhost:8080/scan?image=registry.suse.com/bci/bci-busybox:latest"
+
+Then to fetch the scan report:
+
+curl "http://localhost:8080/report?report=registry.suse.com/bci/bci-busybox:latest"
+
 
 ## Features
 
