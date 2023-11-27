@@ -11,7 +11,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o pullworker ./cmd/pullworker
 
 FROM alpine:latest  
-RUN apk --no-cache add ca-certificates docker
+RUN apk --no-cache add ca-certificates skopeo
 
 WORKDIR /root/
 
