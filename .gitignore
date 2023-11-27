@@ -1,2 +1,3 @@
 bin/*
 trivy-reports/*.json
+images/trivy-scan-*

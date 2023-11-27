@@ -30,7 +30,7 @@ services:
       context: .
       dockerfile: Dockerfile-pullworker
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./images:/app/images
       - ./trivy-reports:/app/reports
     networks:
       - trivy-net
@@ -47,7 +47,7 @@ services:
     networks:
       - trivy-net
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./images:/app/images
       - ./trivy-reports:/app/reports
     depends_on:
       - redis
