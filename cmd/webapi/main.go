@@ -46,7 +46,7 @@ func main() {
 
 func handleReport(w http.ResponseWriter, r *http.Request) {
 	// Extract the image name from the query parameter
-	imageName := r.URL.Query().Get("report")
+	imageName := r.URL.Query().Get("image")
 	if imageName == "" {
 		http.Error(w, "Image name is required", http.StatusBadRequest)
 		return

@@ -41,7 +41,7 @@ curl "http://localhost:8080/scan?image=registry.suse.com/bci/bci-busybox:latest"
 Then to fetch the scan report:
 
 ```
-curl "http://localhost:8080/report?report=registry.suse.com/bci/bci-busybox:latest"
+curl "http://localhost:8080/report?image=registry.suse.com/bci/bci-busybox:latest"
 
 ```
 
