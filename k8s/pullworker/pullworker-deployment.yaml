@@ -23,8 +23,15 @@ spec:
               value: "6379"
           image: localhost:5000/trivy_runner_pullworker:latest
           name: pullworker
+          volumeMounts:
+            - mountPath: /app/reports
+              name: shared-reports-volume
+              readOnly: false
       restartPolicy: Always
       volumes:
         - name: shared-reports-volume
           persistentVolumeClaim:
             claimName: shared-reports-claim
+        - name: shared-images-volume
+          persistentVolumeClaim:
+            claimName: shared-images-claim

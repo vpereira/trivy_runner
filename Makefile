@@ -19,6 +19,7 @@ k8s-deploy:
 	kubectl apply -f k8s/redis/redis-deployment.yaml
 	kubectl apply -f k8s/redis/redis-service.yaml
 	kubectl apply -f k8s/volumes/shared-reports-pvc.yaml
+	kubectl apply -f k8s/volumes/shared-reports-pv.yaml
 	kubectl apply -f k8s/webapi/webapi-deployment.yaml
 	kubectl apply -f k8s/webapi/webapi-service.yaml
 	kubectl apply -f k8s/scanworker/scanworker-deployment.yaml
