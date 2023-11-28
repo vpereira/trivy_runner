@@ -24,25 +24,32 @@ var ctx = context.Background()
 var rdb *redis.Client
 
 func main() {
+
 	redisHost := os.Getenv("REDIS_HOST")
+
 	if redisHost == "" {
-		redisHost = "localhost"
+		redisHost = "localhost" // Default value if not set
 	}
 
 	redisPort := os.Getenv("REDIS_PORT")
+
 	if redisPort == "" {
-		redisPort = "6379"
+		redisPort = "6379" // Default value if not set
 	}
 
 	webhookURL := os.Getenv("WEBHOOK_URL")
+
 	if webhookURL == "" {
 		log.Fatal("WEBHOOK_URL environment variable is not set")
 	}
 
+	redisURL := redisHost + ":" + redisPort
+	log.Println("Connecting to Redis at:", redisURL)
+
 	rdb = redis.NewClient(&redis.Options{
-		Addr:     redisHost + ":" + redisPort,
-		Password: "", // No password set
-		DB:       0,  // Default DB
+		Addr:     redisURL, // Update with your Redis address
+		Password: "",       // No password set
+		DB:       0,        // Default DB
 	})
 
 	for {
