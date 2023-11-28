@@ -23,7 +23,7 @@ To set up the Trivy Runner on your local machine, follow these steps:
    ```
 3. Build the application:
    ```
-   go build -o trivy_runner ./cmd/trivy_runner
+    make
    ```
 
 ## Usage
