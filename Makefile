@@ -1,18 +1,22 @@
-.PHONY: all build-webapi build-pullworker build-scanworker
+.PHONY: all webapi pullworker scanworker pushworker
 
-all: build-webapi build-pullworker build-scanworker
+all: webapi pullworker scanworker pushworker
 
-build-webapi:
+webapi:
 	go build -o ./bin/webapi ./cmd/webapi
 
-build-pullworker:
+pullworker:
 	go build -o ./bin/pull_worker ./cmd/pullworker
 
-build-scanworker:
+scanworker:
 	go build -o ./bin/scan_worker ./cmd/scanworker
+
+pushworker:
+	go build -o ./bin/push_worker ./cmd/pushworker
 
 k8s-webapi-portforward:
 	kubectl port-forward svc/webapi 8080:8080
+
 k8s-deploy:
 	kubectl apply -f k8s/registry/registry-deployment.yaml
 	kubectl apply -f k8s/registry/registry-service.yaml

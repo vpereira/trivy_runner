@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -76,4 +77,11 @@ func processQueue() {
 		return
 	}
 	log.Println("Scan complete for image:", imageName, "Results saved to:", resultFileName)
+
+	if os.Getenv("PUSH_TO_CATALOG") != "" {
+		err = rdb.LPush(ctx, "topush", fmt.Sprintf("%s|%s", imageName, resultFileName)).Err()
+		if err != nil {
+			log.Println("Error pushing image to toscan queue:", err)
+		}
+	}
 }
