@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/vpereira/trivy_runner/internal/redisutil"
 )
 
 var ctx = context.Background()
@@ -16,24 +17,7 @@ var rdb *redis.Client
 
 func main() {
 
-	redisHost := os.Getenv("REDIS_HOST")
-	if redisHost == "" {
-		redisHost = "localhost" // Default value if not set
-	}
-
-	redisPort := os.Getenv("REDIS_PORT")
-	if redisPort == "" {
-		redisPort = "6379" // Default value if not set
-	}
-
-	redisURL := redisHost + ":" + redisPort
-	log.Println("Connecting to Redis at:", redisURL)
-
-	rdb = redis.NewClient(&redis.Options{
-		Addr:     redisURL, // Update with your Redis address
-		Password: "",       // No password set
-		DB:       0,        // Default DB
-	})
+	rdb = redisutil.InitializeClient()
 
 	// Start processing loop
 	for {
