@@ -3,7 +3,8 @@ package redisutil_test
 import (
 	"os"
 	"testing"
-	"your_project_root/internal/redisutil"
+
+	"github.com/vpereira/trivy_runner/internal/redisutil"
 )
 
 func TestInitializeClient(t *testing.T) {

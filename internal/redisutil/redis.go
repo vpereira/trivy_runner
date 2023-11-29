@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 // InitializeClient sets up and returns a new Redis client.

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/logging"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/pkg/utils"
