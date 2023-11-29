@@ -23,18 +23,22 @@ k8s-deploy:
 	kubectl apply -f k8s/webapi/webapi-service.yaml
 	kubectl apply -f k8s/scanworker/scanworker-deployment.yaml
 	kubectl apply -f k8s/pullworker/pullworker-deployment.yaml
+	kubectl apply -f k8s/pullworker/pushworker-deployment.yaml
+
 
 k8s-build-images:
 	docker-compose build
 
 k8s-tag-images: k8s-build-images
 	docker tag trivy_runner_scanworker localhost:5000/trivy_runner_scanworker:latest
+	docker tag trivy_runner_pushworker localhost:5000/trivy_runner_pushworker:latest
 	docker tag trivy_runner_pullworker localhost:5000/trivy_runner_pullworker:latest
 	docker tag trivy_runner_webapi localhost:5000/trivy_runner_webapi:latest
 
 k8s-push-images: k8s-tag-images
 	docker push localhost:5000/trivy_runner_scanworker:latest
 	docker push localhost:5000/trivy_runner_pullworker:latest
+	docker push localhost:5000/trivy_runner_pushworker:latest
 	docker push localhost:5000/trivy_runner_webapi:latest
 
 lint:
