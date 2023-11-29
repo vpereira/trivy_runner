@@ -90,6 +90,7 @@ make k8s-tag-images
 The images are tagged as follows:
 - `trivy_runner_scanworker` as `localhost:5000/trivy_runner_scanworker:latest`
 - `trivy_runner_pullworker` as `localhost:5000/trivy_runner_pullworker:latest`
+- `trivy_runner_pushworker` as `localhost:5000/trivy_runner_pushworker:latest`
 - `trivy_runner_webapi` as `localhost:5000/trivy_runner_webapi:latest`
 
 ### `k8s-push-images`
