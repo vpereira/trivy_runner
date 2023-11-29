@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/vpereira/trivy_runner/internal/logging"
+	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/pkg/utils"
 )
 
@@ -17,25 +18,7 @@ var rdb *redis.Client
 
 func main() {
 
-	redisHost := os.Getenv("REDIS_HOST")
-	if redisHost == "" {
-		redisHost = "localhost" // Default value if not set
-	}
-
-	redisPort := os.Getenv("REDIS_PORT")
-	if redisPort == "" {
-		redisPort = "6379" // Default value if not set
-	}
-
-	redisURL := redisHost + ":" + redisPort
-	log.Println("Connecting to Redis at:", redisURL)
-
-	// Initialize Redis Client
-	rdb = redis.NewClient(&redis.Options{
-		Addr:     redisURL, // Update with your Redis address
-		Password: "",       // No password by default
-		DB:       0,        // Default DB
-	})
+	rdb = redisutil.InitializeClient()
 
 	// Setup HTTP server
 	http.Handle("/scan", logging.LoggingMiddleware(http.HandlerFunc(handleScan)))
