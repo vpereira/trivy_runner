@@ -59,7 +59,7 @@ services:
   scanworker:
     build:
       context: .
-      dockerfile: Dockerfile-scanworker
+      dockerfile: ./build/Dockerfile-scanworker
     networks:
       - trivy-net
     volumes:
