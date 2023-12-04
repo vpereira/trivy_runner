@@ -1,10 +1,17 @@
 version: '3.8'
 
+networks:
+  trivy-net:
+    driver: bridge
+  shared_network:
+    external: true
+
 services:
   redis:
     image: "redis:alpine"
+    command: --port 6380
     ports:
-      - "6379:6379"
+      - "6380:6380"
     networks:
       - trivy-net
 
@@ -16,6 +23,7 @@ services:
       - "8080:8080"
     networks:
       - trivy-net
+      - shared_network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./trivy-reports:/app/reports
@@ -23,7 +31,7 @@ services:
       - redis
     environment:
       - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - REDIS_PORT=6380
 
   pullworker:
     build:
@@ -38,7 +46,7 @@ services:
       - redis
     environment:
       - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - REDIS_PORT=6380
 
   pushworker:
     build:
@@ -49,12 +57,14 @@ services:
       - ./trivy-reports:/app/reports
     networks:
       - trivy-net
+      - shared_network
     depends_on:
       - redis
     environment:
+      # should be adapted to your webhook url
+      - WEBHOOK_URL=http://webhook:8080/api/v1/webhook
       - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - WEBHOOK_URL=http://catalog:3000/webhooks/trivy
+      - REDIS_PORT=6380
 
   scanworker:
     build:
@@ -69,9 +79,6 @@ services:
       - redis
     environment:
       - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - REDIS_PORT=6380
 
-networks:
-  trivy-net:
-    driver: bridge
 

@@ -45,6 +45,15 @@ curl "http://localhost:8080/report?image=registry.suse.com/bci/bci-busybox:lates
 
 ```
 
+## Integration with registry catalog
+
+If you want to test integration together with registry catalog
+
+- Check/adapt the `docker-compose-integration.yml` file
+- run `make integration-server`
+
+It will run docker-compose up and set endpoint to send the scan results and flag scanworker to submit the task to pushworker
+
 # Kubernetes Setup Using Docker and Rancher Desktop
 
 This guide provides instructions on how to bootstrap the Kubernetes environment using Docker, Rancher Desktop, and a Makefile for automation.

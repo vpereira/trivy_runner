@@ -1,0 +1,22 @@
+version: '3.8'
+
+networks:
+  trivy-net:
+    driver: bridge
+  shared_network:
+    external: true
+
+services:
+  webapi:
+    networks:
+      - trivy-net
+      - shared_network
+  pushworker:
+    networks:
+      - trivy-net
+      - shared_network
+    environment:
+      - WEBHOOK_URL=http://catalog:3000/webhooks/trivy_webhook
+  scanworker:
+    enviroment:
+      - PUSH_TO_CATALOG=true

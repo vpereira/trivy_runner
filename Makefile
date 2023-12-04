@@ -14,6 +14,10 @@ scanworker:
 pushworker:
 	go build -o ./bin/push_worker ./cmd/pushworker
 
+integration-server:
+	-docker network create shared_network
+	docker-compose -f docker-compose.yml -f docker-compose-integration.yml up
+
 k8s-webapi-portforward:
 	kubectl port-forward svc/webapi 8080:8080
 
