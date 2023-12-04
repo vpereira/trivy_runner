@@ -1,0 +1,16 @@
+# Start from a base image with Go installed
+FROM registry.suse.com/bci/golang:1.20
+
+WORKDIR /app
+
+COPY go.* ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o pullworker ./cmd/pullworker
+
+RUN zypper -n install skopeo
+
+CMD ["./pullworker"]
+

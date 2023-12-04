@@ -28,7 +28,7 @@ services:
   pullworker:
     build:
       context: .
-      dockerfile: Dockerfile-pullworker
+      dockerfile: ./build/Dockerfile-pullworker
     volumes:
       - ./images:/app/images
       - ./trivy-reports:/app/reports
