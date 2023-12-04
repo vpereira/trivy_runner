@@ -1,11 +1,15 @@
 # Start from a base image with Go installed
-FROM golang:1.19 as builder
+FROM registry.suse.com/bci/golang:1.20
 
+RUN mkdir -p /app
 # Set the working directory inside the container
 WORKDIR /app
 
 # Copy go.mod and go.sum and download dependencies
 COPY go.* ./
+
+
+# it wont work on build service
 RUN go mod download
 
 # Copy the source code
@@ -14,16 +18,7 @@ COPY . .
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -o webapi ./cmd/webapi
 
-# Use a minimal alpine image to run the app
-FROM alpine:latest  
-RUN apk --no-cache add ca-certificates
-
-WORKDIR /root/
-
 EXPOSE 8080
-
-# Copy the pre-built binary file from the previous stage
-COPY --from=builder /app/webapi .
 
 # Command to run the binary
 CMD ["./webapi"]
