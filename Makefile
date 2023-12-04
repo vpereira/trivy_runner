@@ -35,10 +35,10 @@ k8s-build-images:
 	docker-compose build
 
 k8s-tag-images: k8s-build-images
-	docker tag trivy_runner_scanworker localhost:5000/trivy_runner_scanworker:latest
-	docker tag trivy_runner_pushworker localhost:5000/trivy_runner_pushworker:latest
-	docker tag trivy_runner_pullworker localhost:5000/trivy_runner_pullworker:latest
-	docker tag trivy_runner_webapi localhost:5000/trivy_runner_webapi:latest
+	docker tag trivy_runner-scanworker localhost:5000/trivy_runner_scanworker:latest
+	docker tag trivy_runner-pushworker localhost:5000/trivy_runner_pushworker:latest
+	docker tag trivy_runner-pullworker localhost:5000/trivy_runner_pullworker:latest
+	docker tag trivy_runner-webapi localhost:5000/trivy_runner_webapi:latest
 
 k8s-push-images: k8s-tag-images
 	docker push localhost:5000/trivy_runner_scanworker:latest
