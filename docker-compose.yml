@@ -43,7 +43,7 @@ services:
   pushworker:
     build:
       context: .
-      dockerfile: Dockerfile-pushworker
+      dockerfile: ./build/Dockerfile-pushworker
     volumes:
       - ./images:/app/images
       - ./trivy-reports:/app/reports
