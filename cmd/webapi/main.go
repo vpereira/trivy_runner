@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/logging"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
@@ -15,12 +18,17 @@ import (
 
 var ctx = context.Background()
 var rdb *redis.Client
+var opsProcessed = promauto.NewCounter(prometheus.CounterOpts{
+	Name: "webapi_processed_ops_total",
+	Help: "The total number of processed events",
+})
 
 func main() {
 
 	rdb = redisutil.InitializeClient()
 
 	// Setup HTTP server
+	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/scan", logging.LoggingMiddleware(http.HandlerFunc(handleScan)))
 	http.Handle("/report", logging.LoggingMiddleware(http.HandlerFunc(handleReport)))
 	log.Println("Server started on :8080")
@@ -71,6 +79,8 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Increment Prometheus counter
+	opsProcessed.Inc()
 	// Respond with the path for the result
 	filePath := utils.ImageToFilename(imageName)
 	response := map[string]string{"resultPath": filePath}
