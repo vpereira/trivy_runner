@@ -1,7 +1,9 @@
-.PHONY: all webapi pullworker scanworker pushworker
+.PHONY: all webapi pullworker scanworker pushworker test
 
 all: webapi pullworker scanworker pushworker
 
+test:
+	go test ./...
 webapi:
 	go build -o ./bin/webapi ./cmd/webapi
 
