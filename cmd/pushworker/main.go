@@ -69,8 +69,8 @@ func processQueue(webhookURL string) {
 		RanAt:   time.Now().Format(time.RFC3339),
 		Results: scanResults,
 	}
-
-	sendToWebhook(webhookURL, scanResult)
+	// send it with a goroutine
+	go sendToWebhook(webhookURL, scanResult)
 }
 
 func extractResults(filePath string) (json.RawMessage, error) {
