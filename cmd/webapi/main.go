@@ -81,8 +81,8 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 
 	// Increment Prometheus counter in a goroutine
 	go func() {
-        	opsProcessed.Inc()
-    	}()
+		opsProcessed.Inc()
+	}()
 
 	// Respond with the path for the result
 	filePath := utils.ImageToFilename(imageName)
