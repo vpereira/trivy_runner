@@ -18,5 +18,5 @@ services:
     environment:
       - WEBHOOK_URL=http://catalog:3000/webhooks/trivy_webhook
   scanworker:
-    enviroment:
+    environment:
       - PUSH_TO_CATALOG=true
