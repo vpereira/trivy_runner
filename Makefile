@@ -39,23 +39,11 @@ k8s-deploy:
 	kubectl apply -f k8s/pullworker/pullworker-deployment.yaml
 	kubectl apply -f k8s/pullworker/pushworker-deployment.yaml
 
+helm-deploy: helm-remove
+	helm install trivy-runner ./deploy
 
-HELMIFY ?= $(LOCALBIN)/helmify
-
-helmify: $(HELMIFY) ## Download helmify locally if necessary.
-
-$(HELMIFY): $(LOCALBIN)
-	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
-
-# Define the directories for each component
-COMPONENTS := webapi scanworker pullworker pushworker registry
-
-# Define the helm task
-helm:
-	@for component in $(COMPONENTS); do\
-        	echo "Creating Helm chart for $${component}...";\
-        	cat k8s/$${component}-deployment.yaml | helmify;\
-    	done
+helm-remove:
+	-helm uninstall trivy-runner
 
 k8s-build-images:
 	docker-compose build
