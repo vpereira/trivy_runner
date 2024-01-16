@@ -26,6 +26,9 @@ integration-server:
 k8s-webapi-portforward:
 	kubectl port-forward svc/webapi 8080:8080
 
+k8s-registry-portwordard:
+	kubectl port-forward svc/registry 5000:5000
+
 k8s-deploy:
 	kubectl apply -f k8s/registry/registry-deployment.yaml
 	kubectl apply -f k8s/registry/registry-service.yaml
