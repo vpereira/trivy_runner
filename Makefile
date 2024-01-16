@@ -37,7 +37,7 @@ k8s-deploy:
 	kubectl apply -f k8s/webapi/webapi-service.yaml
 	kubectl apply -f k8s/scanworker/scanworker-deployment.yaml
 	kubectl apply -f k8s/pullworker/pullworker-deployment.yaml
-	kubectl apply -f k8s/pullworker/pushworker-deployment.yaml
+	kubectl apply -f k8s/pushworker/pushworker-deployment.yaml
 
 
 HELMIFY ?= $(LOCALBIN)/helmify

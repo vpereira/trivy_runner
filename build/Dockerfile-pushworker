@@ -1,5 +1,5 @@
 # Similar structure to Dockerfile-webapi
-FROM registry.suse.com/bci/golang:1.20
+FROM registry.opensuse.org/opensuse/bci/golang:latest
 
 WORKDIR /app
 

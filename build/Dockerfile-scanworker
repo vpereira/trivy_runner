@@ -1,5 +1,5 @@
 # Similar structure to Dockerfile-webapi
-FROM opensuse/tumbleweed:latest
+FROM registry.opensuse.org/opensuse/tumbleweed:latest
 
 RUN zypper -n install ca-certificates go trivy
 
