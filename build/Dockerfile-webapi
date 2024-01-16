@@ -1,5 +1,5 @@
 # Start from a base image with Go installed
-FROM registry.suse.com/bci/golang:1.20
+FROM registry.opensuse.org/opensuse/bci/golang:latest
 
 RUN mkdir -p /app
 # Set the working directory inside the container
