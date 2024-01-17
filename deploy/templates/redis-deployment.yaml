@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    {{- include "deploy.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "deploy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "deploy.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: redis
+        image: "registry.opensuse.org/home/vpereirabr/dockerimages/containers/vpereirabr/trivy_runner_redis:latest"
