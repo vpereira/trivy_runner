@@ -19,7 +19,9 @@ func main() {
 
 	rdb = redisutil.InitializeClient()
 
-	err := os.MkdirAll("/apps/reports", os.ModePerm)
+	reportsAppDir := redisutil.GetEnv("REPORTS_APP_DIR", "/app/reports")
+
+	err := os.MkdirAll(reportsAppDir, os.ModePerm)
 	if err != nil {
 		log.Fatal("Failed to create base directory:", err)
 	}

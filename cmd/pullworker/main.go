@@ -17,7 +17,10 @@ var rdb *redis.Client
 func main() {
 
 	rdb = redisutil.InitializeClient()
-	err := os.MkdirAll("/app/images", os.ModePerm)
+
+	imagesAppDir := redisutil.GetEnv("IMAGES_APP_DIR", "/app/images")
+
+	err := os.MkdirAll(imagesAppDir, os.ModePerm)
 
 	if err != nil {
 		log.Fatal("Failed to create base directory:", err)
