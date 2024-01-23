@@ -49,6 +49,9 @@ func processQueue() {
 
 	imageName := result
 
+	log.Println("Processing image: ", imageName)
+	log.Println("Target directory: ", targetDir)
+
 	// Equivalent of `skopeo copy --remove-signatures "$image" "oci://${target_dir}"`
 	cmd := exec.Command("skopeo", "copy", "--remove-signatures", fmt.Sprintf("docker://%s", imageName), "oci://"+targetDir)
 
@@ -65,6 +68,8 @@ func processQueue() {
 	}
 
 	toScanString := fmt.Sprintf("%s|%s", imageName, targetDir)
+
+	log.Println("Pushing image to toscan queue:", toScanString)
 
 	err = rdb.LPush(ctx, "toscan", toScanString).Err()
 	if err != nil {
