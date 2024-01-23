@@ -28,11 +28,20 @@ func main() {
 	rdb = redisutil.InitializeClient()
 
 	// Setup HTTP server
+	http.Handle("/health", logging.LoggingMiddleware(http.HandlerFunc(handleHealth)))
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/scan", logging.LoggingMiddleware(http.HandlerFunc(handleScan)))
 	http.Handle("/report", logging.LoggingMiddleware(http.HandlerFunc(handleReport)))
 	log.Println("Server started on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	// Set the content type and write the response
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{"result": "ok"}
+	json.NewEncoder(w).Encode(response)
 }
 
 func handleReport(w http.ResponseWriter, r *http.Request) {
