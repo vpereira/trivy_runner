@@ -6,7 +6,7 @@ require (
 	github.com/alicebob/miniredis/v2 v2.31.1
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/prometheus/client_golang v1.18.0
-	github.com/redis/go-redis/v9 v9.3.1
+	github.com/redis/go-redis/v9 v9.4.0
 )
 
 require (
