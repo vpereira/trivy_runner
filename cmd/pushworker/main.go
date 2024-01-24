@@ -70,7 +70,7 @@ func processQueue(webhookURL string) {
 		Results: scanResults,
 	}
 	// send it with a goroutine
-	go sendToWebhook(webhookURL, scanResult)
+	go sendToWebhook(webhookURL, scanResult, imageName)
 }
 
 func extractResults(filePath string) (json.RawMessage, error) {
@@ -89,14 +89,17 @@ func extractResults(filePath string) (json.RawMessage, error) {
 	return result.Results, nil
 }
 
-func sendToWebhook(webhookURL string, result ScanResult) {
+func sendToWebhook(webhookURL string, result ScanResult, imageName string) {
+
 	jsonData, err := json.Marshal(result)
+
 	if err != nil {
 		log.Println("Error marshaling JSON:", err)
 		return
 	}
 
 	req, err := http.NewRequest("POST", webhookURL, bytes.NewBuffer(jsonData))
+
 	if err != nil {
 		log.Println("Error creating request:", err)
 		return
@@ -115,5 +118,7 @@ func sendToWebhook(webhookURL string, result ScanResult) {
 
 	if resp.StatusCode != http.StatusOK {
 		log.Println("Failed to send report, status code:", resp.StatusCode)
+	} else {
+		log.Println("Report sent successfully for image:", imageName)
 	}
 }
