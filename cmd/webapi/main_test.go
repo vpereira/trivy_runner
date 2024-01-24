@@ -34,3 +34,24 @@ func TestHandleScan(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 }
+
+func TestHandleHealth(t *testing.T) {
+	req, err := http.NewRequest("GET", "/health", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(handleHealth)
+	handler.ServeHTTP(rr, req)
+
+	response := rr.Result()
+	headers := rr.Header()
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v", response.StatusCode, http.StatusOK)
+	}
+
+	if content_type := headers.Get("content-type"); content_type != "application/json" {
+		t.Errorf("handler returned wrong content-type: got '%v' want '%v'", content_type, "application/json")
+	}
+}
