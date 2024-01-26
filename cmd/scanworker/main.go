@@ -9,13 +9,16 @@ import (
 	"strings"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 )
 
 var ctx = context.Background()
 var rdb *redis.Client
+var airbrakeNotifier *airbrake.AirbrakeNotifier
 
 func main() {
+	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
 
 	rdb = redisutil.InitializeClient()
 
@@ -24,6 +27,7 @@ func main() {
 	err := os.MkdirAll(reportsAppDir, os.ModePerm)
 	if err != nil {
 		log.Fatal("Failed to create base directory:", err)
+		airbrakeNotifier.NotifyAirbrake(err)
 	}
 
 	// Start processing loop
@@ -37,6 +41,7 @@ func processQueue() {
 	redisAnswer, err := rdb.BRPop(ctx, 0, "toscan").Result()
 	if err != nil {
 		log.Println("Error:", err)
+		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
 
@@ -45,6 +50,7 @@ func processQueue() {
 	parts := strings.Split(redisAnswer[1], "|")
 	if len(parts) != 2 {
 		log.Println("Error: invalid format in Redis answer")
+		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
 
@@ -65,6 +71,7 @@ func processQueue() {
 	cmd := exec.Command("trivy", "image", "--format", "json", "--output", resultFileName, "--input", targetDir)
 	if err := cmd.Run(); err != nil {
 		log.Println("Failed to scan image:", imageName, "Error:", err)
+		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
 	log.Println("Scan complete for image:", imageName, "Results saved to:", resultFileName)
@@ -73,6 +80,7 @@ func processQueue() {
 		err = rdb.LPush(ctx, "topush", fmt.Sprintf("%s|%s", imageName, resultFileName)).Err()
 		if err != nil {
 			log.Println("Error pushing image to toscan queue:", err)
+			airbrakeNotifier.NotifyAirbrake(err)
 		}
 	}
 }
