@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/airbrake/gobrake/v5"
-	"github.com/vpereira/trivy_runner/internal/redisutil"
 )
 
 type AirbrakeNotifier struct {
@@ -16,7 +15,8 @@ type AirbrakeNotifier struct {
 func NewAirbrakeNotifier() *AirbrakeNotifier {
 	projectIDStr := os.Getenv("AIRBRAKE_PROJECT_ID")
 	projectKey := os.Getenv("AIRBRAKE_PROJECT_KEY")
-	projectEnvironment := redisutil.GetEnv("AIRBRAKE_ENVIRONMENT", "development")
+	projectEnvironment := os.Getenv("AIRBRAKE_ENVIRONMENT")
+	errbitURL := os.Getenv("AIRBRAKE_ERRBIT_URL")
 
 	if projectIDStr == "" || projectKey == "" {
 		return &AirbrakeNotifier{Enabled: false}
@@ -31,6 +31,7 @@ func NewAirbrakeNotifier() *AirbrakeNotifier {
 		ProjectId:   projectID,
 		ProjectKey:  projectKey,
 		Environment: projectEnvironment,
+		Host:        errbitURL, // Set custom Errbit URL if provided
 	})
 
 	return &AirbrakeNotifier{
