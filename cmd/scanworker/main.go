@@ -16,13 +16,14 @@ import (
 var ctx = context.Background()
 var rdb *redis.Client
 var airbrakeNotifier *airbrake.AirbrakeNotifier
+var reportsAppDir string
 
 func main() {
 	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
 
 	rdb = redisutil.InitializeClient()
 
-	reportsAppDir := redisutil.GetEnv("REPORTS_APP_DIR", "/app/reports")
+	reportsAppDir = redisutil.GetEnv("REPORTS_APP_DIR", "/app/reports")
 
 	err := os.MkdirAll(reportsAppDir, os.ModePerm)
 	if err != nil {
@@ -63,7 +64,7 @@ func processQueue() {
 	// Sanitize the image name to create a valid filename
 	safeImageName := strings.ReplaceAll(imageName, "/", "_")
 	safeImageName = strings.ReplaceAll(safeImageName, ":", "_")
-	resultFileName := "/app/reports/" + safeImageName + ".json"
+	resultFileName := reportsAppDir + safeImageName + ".json"
 
 	log.Println("Scanning image:", imageName)
 	log.Println("Saving results to:", resultFileName)
