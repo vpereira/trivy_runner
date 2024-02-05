@@ -13,6 +13,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
+	"go.uber.org/zap"
 )
 
 type ScanResult struct {
@@ -23,13 +24,21 @@ type ScanResult struct {
 
 var ctx = context.Background()
 var rdb *redis.Client
+var logger *zap.Logger
 
 func main() {
+	logger, err := zap.NewProduction()
+
+	if err != nil {
+		log.Fatal("Failed to create logger:", err)
+	}
+
+	defer logger.Sync()
 
 	webhookURL := os.Getenv("WEBHOOK_URL")
 
 	if webhookURL == "" {
-		log.Fatal("WEBHOOK_URL environment variable is not set")
+		logger.Error("WEBHOOK_URL environment variable is not set")
 	}
 
 	rdb = redisutil.InitializeClient()
@@ -42,7 +51,7 @@ func main() {
 func processQueue(webhookURL string) {
 	redisAnswer, err := rdb.BRPop(ctx, 0, "topush").Result()
 	if err != nil {
-		log.Println("Error:", err)
+		logger.Error("Error:", zap.Error(err))
 		return
 	}
 
@@ -50,7 +59,7 @@ func processQueue(webhookURL string) {
 	// [topush registry.suse.com/bci/bci-busybox:latest|/app/reports/registry.suse.com_bci_bci-busybox_latest.json]
 	parts := strings.Split(redisAnswer[1], "|")
 	if len(parts) != 2 {
-		log.Println("Error: invalid format in Redis answer")
+		logger.Error("Error: invalid format in Redis answer", zap.Strings("parts", parts))
 		return
 	}
 
@@ -60,7 +69,7 @@ func processQueue(webhookURL string) {
 	scanResults, err := extractResults(reportPath)
 
 	if err != nil {
-		log.Println("Error processing file:", reportPath, "Error:", err)
+		logger.Error("Error processing file:", zap.String("json_report", reportPath), zap.Error(err))
 		return
 	}
 
@@ -94,16 +103,17 @@ func sendToWebhook(webhookURL string, result ScanResult, imageName string) {
 	jsonData, err := json.Marshal(result)
 
 	if err != nil {
-		log.Println("Error marshaling JSON:", err)
+		logger.Error("Error marshaling JSON:", zap.Error(err))
 		return
 	}
 
 	req, err := http.NewRequest("POST", webhookURL, bytes.NewBuffer(jsonData))
 
 	if err != nil {
-		log.Println("Error creating request:", err)
+		logger.Error("Error creating request:", zap.Error(err))
 		return
 	}
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
@@ -111,14 +121,15 @@ func sendToWebhook(webhookURL string, result ScanResult, imageName string) {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		log.Println("Failed to send report:", err)
+		logger.Error("Failed to send report:", zap.Error(err))
 		return
 	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Println("Failed to send report, status code:", resp.StatusCode)
+		logger.Error("Failed to send report, status code:", zap.Int("status_code", resp.StatusCode))
 	} else {
-		log.Println("Report sent successfully for image:", imageName)
+		logger.Info("Report sent successfully for image:", zap.String("imageName", imageName))
 	}
 }

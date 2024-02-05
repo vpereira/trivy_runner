@@ -8,9 +8,17 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 func InitializeClient() *redis.Client {
+
+	logger, err := zap.NewProduction()
+
+	if err != nil {
+		log.Fatal("Failed to create logger:", err)
+	}
+
 	redisHost := GetEnv("REDIS_HOST", "localhost")
 	redisPort := GetEnv("REDIS_PORT", "6379")
 	redisURL := redisHost + ":" + redisPort
@@ -28,6 +36,7 @@ func InitializeClient() *redis.Client {
 	for i := 0; i < maxRetries; i++ {
 		_, err := redisClient.Ping(context.Background()).Result()
 		if err != nil {
+			logger.Info("Redis Connection Failed:", zap.Int("try", i+1), zap.String("redis_url", redisURL), zap.Error(err))
 			log.Printf("Attempt %d: Failed to connect to Redis at %s: %v", i+1, redisURL, err)
 			time.Sleep(retryInterval)
 			continue
