@@ -21,7 +21,8 @@ var reportsAppDir string
 var logger *zap.Logger
 
 func main() {
-	logger, err := zap.NewProduction()
+	var err error
+	logger, err = zap.NewProduction()
 
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
@@ -30,6 +31,12 @@ func main() {
 	defer logger.Sync()
 
 	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
+
+	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
+
+	if airbrakeNotifier == nil {
+		logger.Error("Failed to create airbrake notifier")
+	}
 
 	rdb = redisutil.InitializeClient()
 
@@ -62,7 +69,7 @@ func processQueue() {
 	parts := strings.Split(redisAnswer[1], "|")
 	if len(parts) != 2 {
 		logger.Error("Error: invalid format in Redis answer", zap.Strings("parts", parts))
-		airbrakeNotifier.NotifyAirbrake(err)
+		airbrakeNotifier.NotifyAirbrake(fmt.Errorf("Invalid format in Redis answer: %v", parts))
 		return
 	}
 

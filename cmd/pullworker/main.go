@@ -20,14 +20,21 @@ var imagesAppDir string
 var logger *zap.Logger
 
 func main() {
+	var err error
 
-	logger, err := zap.NewProduction()
+	logger, err = zap.NewProduction()
 
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
 	}
 
 	defer logger.Sync()
+
+	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
+
+	if airbrakeNotifier == nil {
+		logger.Error("Failed to create airbrake notifier")
+	}
 
 	rdb = redisutil.InitializeClient()
 
@@ -64,6 +71,11 @@ func processQueue() {
 	}
 
 	imageName := result
+
+	if imageName == "" {
+		logger.Error("No image name found in queue")
+		return
+	}
 
 	logger.Info("Processing image: ", zap.String("imageName", imageName))
 	logger.Info("Target directory: ", zap.String("targetDir", targetDir))

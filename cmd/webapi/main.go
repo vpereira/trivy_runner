@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
+	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/logging"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/pkg/utils"
@@ -22,6 +23,8 @@ var logger *zap.Logger
 
 var ctx = context.Background()
 var rdb *redis.Client
+
+var airbrakeNotifier *airbrake.AirbrakeNotifier
 
 var opsProcessed = promauto.NewCounter(prometheus.CounterOpts{
 	Name: "webapi_processed_ops_total",
@@ -34,14 +37,20 @@ var opsProcessedError = promauto.NewCounter(prometheus.CounterOpts{
 })
 
 func main() {
-
-	logger, err := zap.NewProduction()
+	var err error
+	logger, err = zap.NewProduction()
 
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
 	}
 
 	defer logger.Sync()
+
+	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
+
+	if airbrakeNotifier == nil {
+		logger.Error("Failed to create airbrake notifier")
+	}
 
 	rdb = redisutil.InitializeClient()
 
@@ -109,6 +118,7 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		go increasePrometheusErrors()
 		logger.Error("Failed to push image to queue", zap.String("image", imageName), zap.Error(err))
+		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
 

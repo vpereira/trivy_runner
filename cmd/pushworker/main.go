@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"go.uber.org/zap"
 )
@@ -26,14 +27,23 @@ var ctx = context.Background()
 var rdb *redis.Client
 var logger *zap.Logger
 
+var airbrakeNotifier *airbrake.AirbrakeNotifier
+
 func main() {
-	logger, err := zap.NewProduction()
+	var err error
+	logger, err = zap.NewProduction()
 
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
 	}
 
 	defer logger.Sync()
+
+	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
+
+	if airbrakeNotifier == nil {
+		logger.Error("Failed to create airbrake notifier")
+	}
 
 	webhookURL := os.Getenv("WEBHOOK_URL")
 
@@ -52,6 +62,7 @@ func processQueue(webhookURL string) {
 	redisAnswer, err := rdb.BRPop(ctx, 0, "topush").Result()
 	if err != nil {
 		logger.Error("Error:", zap.Error(err))
+		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
 
@@ -60,6 +71,7 @@ func processQueue(webhookURL string) {
 	parts := strings.Split(redisAnswer[1], "|")
 	if len(parts) != 2 {
 		logger.Error("Error: invalid format in Redis answer", zap.Strings("parts", parts))
+		airbrakeNotifier.NotifyAirbrake(fmt.Errorf("Invalid format in Redis answer: %v", parts))
 		return
 	}
 
@@ -70,6 +82,7 @@ func processQueue(webhookURL string) {
 
 	if err != nil {
 		logger.Error("Error processing file:", zap.String("json_report", reportPath), zap.Error(err))
+		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
 
@@ -104,6 +117,7 @@ func sendToWebhook(webhookURL string, result ScanResult, imageName string) {
 
 	if err != nil {
 		logger.Error("Error marshaling JSON:", zap.Error(err))
+		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
 
@@ -111,6 +125,7 @@ func sendToWebhook(webhookURL string, result ScanResult, imageName string) {
 
 	if err != nil {
 		logger.Error("Error creating request:", zap.Error(err))
+		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
 
@@ -122,6 +137,7 @@ func sendToWebhook(webhookURL string, result ScanResult, imageName string) {
 
 	if err != nil {
 		logger.Error("Failed to send report:", zap.Error(err))
+		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
 
@@ -129,6 +145,7 @@ func sendToWebhook(webhookURL string, result ScanResult, imageName string) {
 
 	if resp.StatusCode != http.StatusOK {
 		logger.Error("Failed to send report, status code:", zap.Int("status_code", resp.StatusCode))
+		airbrakeNotifier.NotifyAirbrake(err)
 	} else {
 		logger.Info("Report sent successfully for image:", zap.String("imageName", imageName))
 	}
