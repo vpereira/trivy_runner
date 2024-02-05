@@ -47,7 +47,7 @@ func TestProcessQueue(t *testing.T) {
 	rdb = redis.NewClient(&redis.Options{
 		Addr: mr.Addr(),
 	})
-	_, err = rdb.RPush(ctx, "topush", "registry.suse.com/bci/bci-busybox:latest|/app/reports/registry.suse.com_bci_bci-busybox_latest.json").Result()
+	_, err = rdb.RPush(ctx, "topush", "registry.suse.com/bci/bci-busybox:latest|./test_reports/registry.suse.com_bci_bci-busybox_latest.json").Result()
 	if err != nil {
 		t.Fatal(err)
 	}
