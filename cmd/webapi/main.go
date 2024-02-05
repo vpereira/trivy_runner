@@ -23,6 +23,11 @@ var opsProcessed = promauto.NewCounter(prometheus.CounterOpts{
 	Help: "The total number of processed events",
 })
 
+var opsProcessedError = promauto.NewCounter(prometheus.CounterOpts{
+	Name: "webapi_processed_errors_total",
+	Help: "The total number of errors while processing events",
+})
+
 func main() {
 
 	rdb = redisutil.InitializeClient()
@@ -49,6 +54,7 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	imageName := r.URL.Query().Get("image")
 	if imageName == "" {
 		http.Error(w, "Image name is required", http.StatusBadRequest)
+		go increasePrometheusErrors()
 		return
 	}
 
@@ -59,6 +65,7 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Report not found"})
+		go increasePrometheusErrors()
 		return
 	}
 
@@ -66,6 +73,7 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	report, err := os.ReadFile(filePath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		go increasePrometheusErrors()
 		return
 	}
 
@@ -78,6 +86,7 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 	imageName := r.URL.Query().Get("image")
 	if imageName == "" {
 		http.Error(w, "Image name is required", http.StatusBadRequest)
+		go increasePrometheusErrors()
 		return
 	}
 
@@ -85,16 +94,23 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 	err := rdb.LPush(ctx, "topull", imageName).Err()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		go increasePrometheusErrors()
 		return
 	}
 
 	// Increment Prometheus counter in a goroutine
-	go func() {
-		opsProcessed.Inc()
-	}()
+	go increasePrometheusCounter()
 
 	// Respond with the path for the result
 	filePath := utils.ImageToFilename(imageName)
 	response := map[string]string{"resultPath": filePath}
 	json.NewEncoder(w).Encode(response)
+}
+
+func increasePrometheusCounter() {
+	opsProcessed.Inc()
+}
+
+func increasePrometheusErrors() {
+	opsProcessedError.Inc()
 }
