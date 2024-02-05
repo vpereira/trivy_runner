@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,9 +11,11 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 func TestProcessQueue(t *testing.T) {
+	logger, _ = zap.NewProduction()
 	// Mock Redis server
 	mr, err := miniredis.Run()
 	if err != nil {
@@ -24,7 +26,7 @@ func TestProcessQueue(t *testing.T) {
 	// Mock webhook server
 	webhookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var result ScanResult
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &result)
 
 		if result.Image != "registry.suse.com/bci/bci-busybox:latest" {
@@ -33,6 +35,7 @@ func TestProcessQueue(t *testing.T) {
 
 		w.WriteHeader(http.StatusOK)
 	}))
+
 	defer webhookServer.Close()
 
 	// Set environment variables
@@ -44,7 +47,7 @@ func TestProcessQueue(t *testing.T) {
 	rdb = redis.NewClient(&redis.Options{
 		Addr: mr.Addr(),
 	})
-	_, err = rdb.RPush(ctx, "topush", "registry.suse.com/bci/bci-busybox:latest|/app/reports/registry.suse.com_bci_bci-busybox_latest.json").Result()
+	_, err = rdb.RPush(ctx, "topush", "registry.suse.com/bci/bci-busybox:latest|./test_reports/registry.suse.com_bci_bci-busybox_latest.json").Result()
 	if err != nil {
 		t.Fatal(err)
 	}

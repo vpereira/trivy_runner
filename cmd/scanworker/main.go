@@ -11,23 +11,41 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
+	"go.uber.org/zap"
 )
 
 var ctx = context.Background()
 var rdb *redis.Client
 var airbrakeNotifier *airbrake.AirbrakeNotifier
 var reportsAppDir string
+var logger *zap.Logger
 
 func main() {
+	var err error
+	logger, err = zap.NewProduction()
+
+	if err != nil {
+		log.Fatal("Failed to create logger:", err)
+	}
+
+	defer logger.Sync()
+
 	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
+
+	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
+
+	if airbrakeNotifier == nil {
+		logger.Error("Failed to create airbrake notifier")
+	}
 
 	rdb = redisutil.InitializeClient()
 
 	reportsAppDir = redisutil.GetEnv("REPORTS_APP_DIR", "/app/reports")
 
-	err := os.MkdirAll(reportsAppDir, os.ModePerm)
+	err = os.MkdirAll(reportsAppDir, os.ModePerm)
+
 	if err != nil {
-		log.Fatal("Failed to create base directory:", err)
+		logger.Error("Failed to create base directory:", zap.String("dir", reportsAppDir), zap.Error(err))
 		airbrakeNotifier.NotifyAirbrake(err)
 	}
 
@@ -41,7 +59,7 @@ func processQueue() {
 	// Block until an image name is available in the 'toscan' queue
 	redisAnswer, err := rdb.BRPop(ctx, 0, "toscan").Result()
 	if err != nil {
-		log.Println("Error:", err)
+		logger.Error("Error:", zap.Error(err))
 		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
@@ -50,8 +68,8 @@ func processQueue() {
 	// [toscan registry.suse.com/bci/bci-busybox:latest|/app/images/trivy-scan-1918888852]
 	parts := strings.Split(redisAnswer[1], "|")
 	if len(parts) != 2 {
-		log.Println("Error: invalid format in Redis answer")
-		airbrakeNotifier.NotifyAirbrake(err)
+		logger.Error("Error: invalid format in Redis answer", zap.Strings("parts", parts))
+		airbrakeNotifier.NotifyAirbrake(fmt.Errorf("Invalid format in Redis answer: %v", parts))
 		return
 	}
 
@@ -66,21 +84,23 @@ func processQueue() {
 	safeImageName = strings.ReplaceAll(safeImageName, ":", "_")
 	resultFileName := reportsAppDir + safeImageName + ".json"
 
-	log.Println("Scanning image:", imageName)
-	log.Println("Saving results to:", resultFileName)
+	logger.Info("Scanning image:", zap.String("image", imageName))
+	logger.Info("Saving results to:", zap.String("json_report", resultFileName))
 
 	cmd := exec.Command("trivy", "image", "--format", "json", "--output", resultFileName, "--input", targetDir)
+
 	if err := cmd.Run(); err != nil {
-		log.Println("Failed to scan image:", imageName, "Error:", err)
+		logger.Error("Failed to scan image:", zap.String("image", imageName), zap.Error(err))
 		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
-	log.Println("Scan complete for image:", imageName, "Results saved to:", resultFileName)
+
+	logger.Info("Scan complete for image:", zap.String("image", imageName), zap.String("json_report", resultFileName))
 
 	if os.Getenv("PUSH_TO_CATALOG") != "" {
 		err = rdb.LPush(ctx, "topush", fmt.Sprintf("%s|%s", imageName, resultFileName)).Err()
 		if err != nil {
-			log.Println("Error pushing image to toscan queue:", err)
+			logger.Info("Error pushing image to toscan queue:", zap.Error(err))
 			airbrakeNotifier.NotifyAirbrake(err)
 		}
 	}

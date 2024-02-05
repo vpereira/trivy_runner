@@ -1,0 +1,77 @@
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2023-12-14T07:36:56.109955817Z",
+  "ArtifactName": "/app/images/trivy-scan-1601040372",
+  "ArtifactType": "container_image",
+  "Metadata": {
+    "OS": {
+      "Family": "suse linux enterprise server",
+      "Name": "15.5"
+    },
+    "ImageID": "sha256:f0ba6e5c18257bcdf87a0264441d1eb0fd403f32f836e943d7421512ef2e540d",
+    "DiffIDs": [
+      "sha256:6764cdfdab4d30d3b52e618e8fdb353d16905ae39c330636838b18cf866dcf32"
+    ],
+    "ImageConfig": {
+      "architecture": "amd64",
+      "author": "SUSE LLC (https://www.suse.com/)",
+      "created": "2023-12-06T14:43:31Z",
+      "history": [
+        {
+          "author": "SUSE LLC \u003chttps://www.suse.com/\u003e",
+          "created": "2023-12-06T14:43:31Z",
+          "created_by": "KIWI 9.24.43"
+        }
+      ],
+      "os": "linux",
+      "rootfs": {
+        "type": "layers",
+        "diff_ids": [
+          "sha256:6764cdfdab4d30d3b52e618e8fdb353d16905ae39c330636838b18cf866dcf32"
+        ]
+      },
+      "config": {
+        "Cmd": [
+          "/bin/sh"
+        ],
+        "Labels": {
+          "com.suse.bci.busybox.created": "2023-12-06T14:43:26.994888914Z",
+          "com.suse.bci.busybox.description": "15 SP5 BusyBox container based on the SLE Base Container Image.",
+          "com.suse.bci.busybox.disturl": "obs://build.suse.de/SUSE:SLE-15-SP5:Update:CR/images/e31a4d6894801bee7f474e63923dc06a-busybox-image",
+          "com.suse.bci.busybox.eula": "sle-bci",
+          "com.suse.bci.busybox.image-type": "sle-bci",
+          "com.suse.bci.busybox.lifecycle-url": "https://www.suse.com/lifecycle#suse-linux-enterprise-server-15",
+          "com.suse.bci.busybox.reference": "registry.suse.com/bci/bci-busybox:15.5.12.3",
+          "com.suse.bci.busybox.release-stage": "released",
+          "com.suse.bci.busybox.source": "https://sources.suse.com/SUSE:SLE-15-SP5:Update:CR/busybox-image/e31a4d6894801bee7f474e63923dc06a/",
+          "com.suse.bci.busybox.supportlevel": "l3",
+          "com.suse.bci.busybox.title": "SLE BCI 15 SP5 BusyBox",
+          "com.suse.bci.busybox.url": "https://www.suse.com/products/server/",
+          "com.suse.bci.busybox.vendor": "SUSE LLC",
+          "com.suse.bci.busybox.version": "15.5.12.3",
+          "com.suse.eula": "sle-bci",
+          "com.suse.image-type": "sle-bci",
+          "com.suse.lifecycle-url": "https://www.suse.com/lifecycle#suse-linux-enterprise-server-15",
+          "com.suse.release-stage": "released",
+          "com.suse.supportlevel": "l3",
+          "org.openbuildservice.disturl": "obs://build.suse.de/SUSE:SLE-15-SP5:Update:CR/images/e31a4d6894801bee7f474e63923dc06a-busybox-image",
+          "org.opencontainers.image.created": "2023-12-06T14:43:26.994888914Z",
+          "org.opencontainers.image.description": "15 SP5 BusyBox container based on the SLE Base Container Image.",
+          "org.opencontainers.image.source": "https://sources.suse.com/SUSE:SLE-15-SP5:Update:CR/busybox-image/e31a4d6894801bee7f474e63923dc06a/",
+          "org.opencontainers.image.title": "SLE BCI 15 SP5 BusyBox",
+          "org.opencontainers.image.url": "https://www.suse.com/products/server/",
+          "org.opencontainers.image.vendor": "SUSE LLC",
+          "org.opencontainers.image.version": "15.5.12.3",
+          "org.opensuse.reference": "registry.suse.com/bci/bci-busybox:15.5.12.3"
+        }
+      }
+    }
+  },
+  "Results": [
+    {
+      "Target": "/app/images/trivy-scan-1601040372 (suse linux enterprise server 15.5)",
+      "Class": "os-pkgs",
+      "Type": "suse linux enterprise server"
+    }
+  ]
+}
