@@ -10,12 +10,14 @@ func TestNewAirbrakeNotifier(t *testing.T) {
 		name        string
 		projectID   string
 		projectKey  string
+		errbitURL   string
 		wantEnabled bool
 	}{
 		{
 			name:        "Valid configuration",
 			projectID:   "12345",
 			projectKey:  "validkey",
+			errbitURL:   "https://example.com",
 			wantEnabled: true,
 		},
 		{
@@ -40,6 +42,7 @@ func TestNewAirbrakeNotifier(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Setenv("AIRBRAKE_PROJECT_ID", tt.projectID)
 			os.Setenv("AIRBRAKE_PROJECT_KEY", tt.projectKey)
+			os.Setenv("AIRBRAKE_ERRBIT_URL", tt.errbitURL)
 
 			notifier := NewAirbrakeNotifier()
 			if notifier.Enabled != tt.wantEnabled {

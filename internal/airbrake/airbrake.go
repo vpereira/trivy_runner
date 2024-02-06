@@ -18,7 +18,7 @@ func NewAirbrakeNotifier() *AirbrakeNotifier {
 	projectEnvironment := os.Getenv("AIRBRAKE_ENVIRONMENT")
 	errbitURL := os.Getenv("AIRBRAKE_ERRBIT_URL")
 
-	if projectIDStr == "" || projectKey == "" {
+	if projectIDStr == "" || projectKey == "" || errbitURL == "" {
 		return &AirbrakeNotifier{Enabled: false}
 	}
 
