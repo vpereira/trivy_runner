@@ -32,8 +32,6 @@ func main() {
 
 	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
 
-	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
-
 	if airbrakeNotifier == nil {
 		logger.Error("Failed to create airbrake notifier")
 	}
