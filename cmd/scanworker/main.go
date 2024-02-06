@@ -4,21 +4,34 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"go.uber.org/zap"
 )
 
-var ctx = context.Background()
-var rdb *redis.Client
-var airbrakeNotifier *airbrake.AirbrakeNotifier
-var reportsAppDir string
-var logger *zap.Logger
+var (
+	ctx                 = context.Background()
+	rdb                 *redis.Client
+	airbrakeNotifier    *airbrake.AirbrakeNotifier
+	reportsAppDir       string
+	logger              *zap.Logger
+	processedOpsCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "scanworker_processed_ops_total",
+		Help: "Total number of processed operations by the scanworker.",
+	})
+	processedErrorsCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "scanworker_processed_errors_total",
+		Help: "Total number of processed errors by the scanworker.",
+	})
+)
 
 func main() {
 	var err error
@@ -47,6 +60,16 @@ func main() {
 		airbrakeNotifier.NotifyAirbrake(err)
 	}
 
+	prometheus.MustRegister(processedOpsCounter)
+	prometheus.MustRegister(processedErrorsCounter)
+
+	// Expose the registered metrics via HTTP.
+	http.Handle("/metrics", promhttp.Handler())
+	go func() {
+		logger.Info("Server started on :8081")
+		log.Fatal(http.ListenAndServe(":8081", nil))
+	}()
+
 	// Start processing loop
 	for {
 		processQueue()
@@ -58,6 +81,7 @@ func processQueue() {
 	redisAnswer, err := rdb.BRPop(ctx, 0, "toscan").Result()
 	if err != nil {
 		logger.Error("Error:", zap.Error(err))
+		processedErrorsCounter.Inc()
 		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
@@ -67,6 +91,7 @@ func processQueue() {
 	parts := strings.Split(redisAnswer[1], "|")
 	if len(parts) != 2 {
 		logger.Error("Error: invalid format in Redis answer", zap.Strings("parts", parts))
+		processedErrorsCounter.Inc()
 		airbrakeNotifier.NotifyAirbrake(fmt.Errorf("Invalid format in Redis answer: %v", parts))
 		return
 	}
@@ -89,6 +114,7 @@ func processQueue() {
 
 	if err := cmd.Run(); err != nil {
 		logger.Error("Failed to scan image:", zap.String("image", imageName), zap.Error(err))
+		processedErrorsCounter.Inc()
 		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
@@ -99,7 +125,10 @@ func processQueue() {
 		err = rdb.LPush(ctx, "topush", fmt.Sprintf("%s|%s", imageName, resultFileName)).Err()
 		if err != nil {
 			logger.Info("Error pushing image to toscan queue:", zap.Error(err))
+			processedErrorsCounter.Inc()
 			airbrakeNotifier.NotifyAirbrake(err)
+		} else {
+			processedOpsCounter.Inc()
 		}
 	}
 }

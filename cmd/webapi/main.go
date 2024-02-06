@@ -54,6 +54,9 @@ func main() {
 
 	rdb = redisutil.InitializeClient()
 
+	prometheus.MustRegister(opsProcessed)
+	prometheus.MustRegister(opsProcessedError)
+
 	// Setup HTTP server
 	http.Handle("/health", logging.LoggingMiddleware(http.HandlerFunc(handleHealth)))
 	http.Handle("/metrics", promhttp.Handler())
