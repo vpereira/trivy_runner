@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"path/filepath"
 	"strings"
 )
 
@@ -15,5 +16,5 @@ func ImageToFilename(imageName string, basePath ...string) string {
 
 	safeImageName := strings.ReplaceAll(imageName, "/", "_")
 	safeImageName = strings.ReplaceAll(safeImageName, ":", "_")
-	return defaultBasePath + "/" + safeImageName + ".json"
+	return filepath.Join(defaultBasePath, safeImageName+".json")
 }

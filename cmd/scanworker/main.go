@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -105,7 +106,7 @@ func processQueue() {
 	// Sanitize the image name to create a valid filename
 	safeImageName := strings.ReplaceAll(imageName, "/", "_")
 	safeImageName = strings.ReplaceAll(safeImageName, ":", "_")
-	resultFileName := reportsAppDir + safeImageName + ".json"
+	resultFileName := filepath.Join(reportsAppDir, safeImageName+".json")
 
 	logger.Info("Scanning image:", zap.String("image", imageName))
 	logger.Info("Saving results to:", zap.String("json_report", resultFileName))
