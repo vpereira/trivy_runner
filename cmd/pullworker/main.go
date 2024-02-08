@@ -80,8 +80,21 @@ func processQueue() {
 	logger.Info("Processing image: ", zap.String("imageName", imageName))
 	logger.Info("Target directory: ", zap.String("targetDir", targetDir))
 
-	// Equivalent of `skopeo copy --remove-signatures "$image" "oci://${target_dir}"`
-	cmd := exec.Command("skopeo", "copy", "--remove-signatures", fmt.Sprintf("docker://%s", imageName), "oci://"+targetDir)
+	// Constructing skopeo command
+	cmdArgs := []string{"copy", "--remove-signatures"}
+
+	// Check and add registry credentials if they are set
+	registryUsername, usernameSet := os.LookupEnv("REGISTRY_USERNAME")
+	registryPassword, passwordSet := os.LookupEnv("REGISTRY_PASSWORD")
+
+	if usernameSet && passwordSet {
+		cmdArgs = append(cmdArgs, "--dest-username", registryUsername, "--dest-password", registryPassword)
+	}
+
+	// Add the rest of the command
+	cmdArgs = append(cmdArgs, fmt.Sprintf("docker://%s", imageName), "oci://"+targetDir)
+
+	cmd := exec.Command("skopeo", cmdArgs...)
 
 	if err := cmd.Run(); err != nil {
 		logger.Error("Failed to copy image:", zap.String("image", imageName), zap.Error(err))
