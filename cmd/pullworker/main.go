@@ -5,19 +5,30 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
+	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"go.uber.org/zap"
 )
 
-var ctx = context.Background()
-var rdb *redis.Client
-var airbrakeNotifier *airbrake.AirbrakeNotifier
-var imagesAppDir string
-var logger *zap.Logger
+var (
+	ctx                 = context.Background()
+	rdb                 *redis.Client
+	airbrakeNotifier    *airbrake.AirbrakeNotifier
+	imagesAppDir        string
+	logger              *zap.Logger
+	processedOpsCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "pullworker_processed_ops_total",
+		Help: "Total number of processed operations by the pullworker.",
+	})
+	processedErrorsCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "pullworker_processed_errors_total",
+		Help: "Total number of processed errors by the pullworker.",
+	})
+)
 
 func main() {
 	var err error
@@ -47,6 +58,9 @@ func main() {
 		airbrakeNotifier.NotifyAirbrake(err)
 	}
 
+	prometheus.MustRegister(processedOpsCounter)
+	prometheus.MustRegister(processedErrorsCounter)
+
 	// Start processing loop
 	for {
 		processQueue()
@@ -59,6 +73,7 @@ func processQueue() {
 
 	if err != nil {
 		logger.Error("Error:", zap.Error(err))
+		processedErrorsCounter.Inc()
 		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
@@ -67,6 +82,7 @@ func processQueue() {
 
 	if err != nil {
 		logger.Error("Failed to create temp directory:", zap.Error(err))
+		processedErrorsCounter.Inc()
 		airbrakeNotifier.NotifyAirbrake(err)
 	}
 
@@ -74,13 +90,50 @@ func processQueue() {
 
 	if imageName == "" {
 		logger.Error("No image name found in queue")
+		processedErrorsCounter.Inc()
 		return
 	}
 
 	logger.Info("Processing image: ", zap.String("imageName", imageName))
 	logger.Info("Target directory: ", zap.String("targetDir", targetDir))
 
-	// Constructing skopeo command
+	cmdArgs := GenerateSkopeoCmdArgs(imageName, targetDir)
+	cmd := exec_command.NewExecShellCommander("skopeo", cmdArgs...)
+
+	if _, err := cmd.Output(); err != nil {
+		logger.Error("Failed to copy image:", zap.String("image", imageName), zap.Error(err))
+		processedErrorsCounter.Inc()
+		airbrakeNotifier.NotifyAirbrake(err)
+		return
+	}
+
+	// Move the image name from 'processing' to 'toscan'
+	_, err = rdb.LRem(ctx, "processing", 1, imageName).Result()
+	if err != nil {
+		logger.Error("Error removing image from processing queue:", zap.Error(err))
+		processedErrorsCounter.Inc()
+		airbrakeNotifier.NotifyAirbrake(err)
+		return
+	}
+
+	toScanString := fmt.Sprintf("%s|%s", imageName, targetDir)
+
+	logger.Info("Pushing image to toscan queue:", zap.String("image", toScanString))
+
+	err = rdb.LPush(ctx, "toscan", toScanString).Err()
+
+	if err != nil {
+		logger.Error("Error pushing image to toscan queue:", zap.Error(err))
+		processedErrorsCounter.Inc()
+		airbrakeNotifier.NotifyAirbrake(err)
+		return
+	}
+
+	processedOpsCounter.Inc()
+}
+
+// GenerateSkopeoCmdArgs generates the command line arguments for the skopeo command based on environment variables and input parameters.
+func GenerateSkopeoCmdArgs(imageName, targetDir string) []string {
 	cmdArgs := []string{"copy", "--remove-signatures"}
 
 	// Check and add registry credentials if they are set
@@ -94,30 +147,5 @@ func processQueue() {
 	// Add the rest of the command
 	cmdArgs = append(cmdArgs, fmt.Sprintf("docker://%s", imageName), "oci://"+targetDir)
 
-	cmd := exec.Command("skopeo", cmdArgs...)
-
-	if err := cmd.Run(); err != nil {
-		logger.Error("Failed to copy image:", zap.String("image", imageName), zap.Error(err))
-		airbrakeNotifier.NotifyAirbrake(err)
-		return
-	}
-
-	// Move the image name from 'processing' to 'toscan'
-	_, err = rdb.LRem(ctx, "processing", 1, imageName).Result()
-	if err != nil {
-		logger.Error("Error removing image from processing queue:", zap.Error(err))
-		airbrakeNotifier.NotifyAirbrake(err)
-		return
-	}
-
-	toScanString := fmt.Sprintf("%s|%s", imageName, targetDir)
-
-	logger.Info("Pushing image to toscan queue:", zap.String("image", toScanString))
-
-	err = rdb.LPush(ctx, "toscan", toScanString).Err()
-
-	if err != nil {
-		logger.Error("Error pushing image to toscan queue:", zap.Error(err))
-		airbrakeNotifier.NotifyAirbrake(err)
-	}
+	return cmdArgs
 }
