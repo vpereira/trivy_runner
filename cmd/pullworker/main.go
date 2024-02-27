@@ -84,6 +84,7 @@ func processQueue() {
 		logger.Error("Failed to create temp directory:", zap.Error(err))
 		processedErrorsCounter.Inc()
 		airbrakeNotifier.NotifyAirbrake(err)
+		return
 	}
 
 	imageName := result
