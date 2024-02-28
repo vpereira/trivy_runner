@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
@@ -60,6 +62,13 @@ func main() {
 
 	prometheus.MustRegister(processedOpsCounter)
 	prometheus.MustRegister(processedErrorsCounter)
+
+	// Expose the registered metrics via HTTP.
+	http.Handle("/metrics", promhttp.Handler())
+	go func() {
+		logger.Info("Server started on :8082")
+		log.Fatal(http.ListenAndServe(":8082", nil))
+	}()
 
 	// Start processing loop
 	for {
