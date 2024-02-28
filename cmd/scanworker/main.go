@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
+	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"go.uber.org/zap"
 )
 
@@ -104,16 +104,16 @@ func processQueue() {
 	defer os.RemoveAll(targetDir)
 
 	// Sanitize the image name to create a valid filename
-	safeImageName := strings.ReplaceAll(imageName, "/", "_")
-	safeImageName = strings.ReplaceAll(safeImageName, ":", "_")
-	resultFileName := filepath.Join(reportsAppDir, safeImageName+".json")
+	resultFileName := calculateResultName(imageName)
 
 	logger.Info("Scanning image:", zap.String("image", imageName))
 	logger.Info("Saving results to:", zap.String("json_report", resultFileName))
 
-	cmd := exec.Command("trivy", "image", "--format", "json", "--output", resultFileName, "--input", targetDir)
+	cmdArgs := generateTrivyCmdArgs(resultFileName, targetDir)
 
-	if err := cmd.Run(); err != nil {
+	cmd := exec_command.NewExecShellCommander("trivy", cmdArgs...)
+
+	if _, err := cmd.Output(); err != nil {
 		logger.Error("Failed to scan image:", zap.String("image", imageName), zap.Error(err))
 		processedErrorsCounter.Inc()
 		airbrakeNotifier.NotifyAirbrake(err)
@@ -132,4 +132,14 @@ func processQueue() {
 			processedOpsCounter.Inc()
 		}
 	}
+}
+
+func calculateResultName(imageName string) string {
+	safeImageName := strings.ReplaceAll(imageName, "/", "_")
+	safeImageName = strings.ReplaceAll(safeImageName, ":", "_")
+	return filepath.Join(reportsAppDir, safeImageName+".json")
+}
+
+func generateTrivyCmdArgs(resultFileName, targetDir string) []string {
+	return []string{"image", "--format", "json", "--output", resultFileName, "--input", targetDir}
 }
