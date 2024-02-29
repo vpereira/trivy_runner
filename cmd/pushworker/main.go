@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/airbrake"
+	"github.com/vpereira/trivy_runner/internal/error_handler"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"go.uber.org/zap"
 )
@@ -23,11 +25,21 @@ type ScanResult struct {
 	Results json.RawMessage `json:"results"`
 }
 
-var ctx = context.Background()
-var rdb *redis.Client
-var logger *zap.Logger
-
-var airbrakeNotifier *airbrake.AirbrakeNotifier
+var (
+	ctx                 = context.Background()
+	rdb                 *redis.Client
+	logger              *zap.Logger
+	airbrakeNotifier    *airbrake.AirbrakeNotifier
+	errorHandler        *error_handler.ErrorHandler
+	processedOpsCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "pushworker_processed_ops_total",
+		Help: "Total number of processed operations by the pushworker.",
+	})
+	processedErrorsCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "pushworker_processed_errors_total",
+		Help: "Total number of processed errors by the pushworker.",
+	})
+)
 
 func main() {
 	var err error
@@ -45,6 +57,8 @@ func main() {
 		logger.Error("Failed to create airbrake notifier")
 	}
 
+	errorHandler = error_handler.NewErrorHandler(logger, processedErrorsCounter, airbrakeNotifier)
+
 	webhookURL := os.Getenv("WEBHOOK_URL")
 
 	if webhookURL == "" {
@@ -53,6 +67,17 @@ func main() {
 
 	rdb = redisutil.InitializeClient()
 
+	prometheus.MustRegister(processedOpsCounter)
+	prometheus.MustRegister(processedErrorsCounter)
+
+	// Expose the registered metrics via HTTP.
+	http.Handle("/metrics", promhttp.Handler())
+
+	go func() {
+		logger.Info("Server started on :8083")
+		log.Fatal(http.ListenAndServe(":8083", nil))
+	}()
+
 	for {
 		processQueue(webhookURL)
 	}
@@ -60,18 +85,18 @@ func main() {
 
 func processQueue(webhookURL string) {
 	redisAnswer, err := rdb.BRPop(ctx, 0, "topush").Result()
+
 	if err != nil {
-		logger.Error("Error:", zap.Error(err))
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
 	// Split the answer
 	// [topush registry.suse.com/bci/bci-busybox:latest|/app/reports/registry.suse.com_bci_bci-busybox_latest.json]
 	parts := strings.Split(redisAnswer[1], "|")
+
 	if len(parts) != 2 {
-		logger.Error("Error: invalid format in Redis answer", zap.Strings("parts", parts))
-		airbrakeNotifier.NotifyAirbrake(fmt.Errorf("Invalid format in Redis answer: %v", parts))
+		errorHandler.Handle(err)
 		return
 	}
 
@@ -81,8 +106,7 @@ func processQueue(webhookURL string) {
 	scanResults, err := extractResults(reportPath)
 
 	if err != nil {
-		logger.Error("Error processing file:", zap.String("json_report", reportPath), zap.Error(err))
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
@@ -98,34 +122,32 @@ func processQueue(webhookURL string) {
 func extractResults(filePath string) (json.RawMessage, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read file: %v", err)
+		errorHandler.Handle(err)
+		return nil, err
 	}
 
 	// unmarshal the data
 	var result ScanResult
 	err = json.Unmarshal(data, &result)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to unmarshal data: %v", err)
+		return nil, err
 	}
 
 	return result.Results, nil
 }
 
 func sendToWebhook(webhookURL string, result ScanResult, imageName string) {
-
 	jsonData, err := json.Marshal(result)
 
 	if err != nil {
-		logger.Error("Error marshaling JSON:", zap.Error(err))
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
 	req, err := http.NewRequest("POST", webhookURL, bytes.NewBuffer(jsonData))
 
 	if err != nil {
-		logger.Error("Error creating request:", zap.Error(err))
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
@@ -136,17 +158,15 @@ func sendToWebhook(webhookURL string, result ScanResult, imageName string) {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		logger.Error("Failed to send report:", zap.Error(err))
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		logger.Error("Failed to send report, status code:", zap.Int("status_code", resp.StatusCode))
-		airbrakeNotifier.NotifyAirbrake(err)
-	} else {
-		logger.Info("Report sent successfully for image:", zap.String("imageName", imageName))
+		errorHandler.Handle(err)
+		return
 	}
+	logger.Info("Report sent successfully for image:", zap.String("imageName", imageName))
 }

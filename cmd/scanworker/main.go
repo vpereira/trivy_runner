@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/airbrake"
+	"github.com/vpereira/trivy_runner/internal/error_handler"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"go.uber.org/zap"
@@ -23,6 +24,7 @@ var (
 	rdb                 *redis.Client
 	airbrakeNotifier    *airbrake.AirbrakeNotifier
 	reportsAppDir       string
+	errorHandler        *error_handler.ErrorHandler
 	logger              *zap.Logger
 	processedOpsCounter = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "scanworker_processed_ops_total",
@@ -49,6 +51,8 @@ func main() {
 	if airbrakeNotifier == nil {
 		logger.Error("Failed to create airbrake notifier")
 	}
+
+	errorHandler = error_handler.NewErrorHandler(logger, processedErrorsCounter, airbrakeNotifier)
 
 	rdb = redisutil.InitializeClient()
 
@@ -81,9 +85,7 @@ func processQueue() {
 	// Block until an image name is available in the 'toscan' queue
 	redisAnswer, err := rdb.BRPop(ctx, 0, "toscan").Result()
 	if err != nil {
-		logger.Error("Error:", zap.Error(err))
-		processedErrorsCounter.Inc()
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
@@ -91,9 +93,8 @@ func processQueue() {
 	// [toscan registry.suse.com/bci/bci-busybox:latest|/app/images/trivy-scan-1918888852]
 	parts := strings.Split(redisAnswer[1], "|")
 	if len(parts) != 2 {
-		logger.Error("Error: invalid format in Redis answer", zap.Strings("parts", parts))
-		processedErrorsCounter.Inc()
-		airbrakeNotifier.NotifyAirbrake(fmt.Errorf("Invalid format in Redis answer: %v", parts))
+		err = fmt.Errorf("invalid format in Redis answer: %v", zap.Strings("parts", parts))
+		errorHandler.Handle(err)
 		return
 	}
 
@@ -114,9 +115,7 @@ func processQueue() {
 	cmd := exec_command.NewExecShellCommander("trivy", cmdArgs...)
 
 	if _, err := cmd.Output(); err != nil {
-		logger.Error("Failed to scan image:", zap.String("image", imageName), zap.Error(err))
-		processedErrorsCounter.Inc()
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
@@ -125,13 +124,11 @@ func processQueue() {
 	if os.Getenv("PUSH_TO_CATALOG") != "" {
 		err = rdb.LPush(ctx, "topush", fmt.Sprintf("%s|%s", imageName, resultFileName)).Err()
 		if err != nil {
-			logger.Info("Error pushing image to toscan queue:", zap.Error(err))
-			processedErrorsCounter.Inc()
-			airbrakeNotifier.NotifyAirbrake(err)
-		} else {
-			processedOpsCounter.Inc()
+			errorHandler.Handle(err)
+			return
 		}
 	}
+	processedOpsCounter.Inc()
 }
 
 func calculateResultName(imageName string) string {
