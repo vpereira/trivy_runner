@@ -12,6 +12,10 @@ type AirbrakeNotifier struct {
 	Enabled  bool
 }
 
+type Notifier interface {
+	NotifyAirbrake(err error)
+}
+
 func NewAirbrakeNotifier() *AirbrakeNotifier {
 	projectIDStr := os.Getenv("AIRBRAKE_PROJECT_ID")
 	projectKey := os.Getenv("AIRBRAKE_PROJECT_KEY")

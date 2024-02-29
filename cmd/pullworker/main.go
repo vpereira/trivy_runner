@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/airbrake"
+	"github.com/vpereira/trivy_runner/internal/error_handler"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"go.uber.org/zap"
@@ -20,6 +21,7 @@ var (
 	ctx                 = context.Background()
 	rdb                 *redis.Client
 	airbrakeNotifier    *airbrake.AirbrakeNotifier
+	errorHandler        *error_handler.ErrorHandler
 	imagesAppDir        string
 	logger              *zap.Logger
 	processedOpsCounter = prometheus.NewCounter(prometheus.CounterOpts{
@@ -48,6 +50,8 @@ func main() {
 	if airbrakeNotifier == nil {
 		logger.Error("Failed to create airbrake notifier")
 	}
+
+	errorHandler = error_handler.NewErrorHandler(logger, processedErrorsCounter, airbrakeNotifier)
 
 	rdb = redisutil.InitializeClient()
 
@@ -81,26 +85,21 @@ func processQueue() {
 	result, err := rdb.BRPopLPush(ctx, "topull", "processing", 0).Result()
 
 	if err != nil {
-		logger.Error("Error:", zap.Error(err))
-		processedErrorsCounter.Inc()
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
 	targetDir, err := os.MkdirTemp(imagesAppDir, "trivy-scan-*")
 
 	if err != nil {
-		logger.Error("Failed to create temp directory:", zap.Error(err))
-		processedErrorsCounter.Inc()
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
 	imageName := result
 
 	if imageName == "" {
-		logger.Error("No image name found in queue")
-		processedErrorsCounter.Inc()
+		errorHandler.Handle(err)
 		return
 	}
 
@@ -111,18 +110,14 @@ func processQueue() {
 	cmd := exec_command.NewExecShellCommander("skopeo", cmdArgs...)
 
 	if _, err := cmd.Output(); err != nil {
-		logger.Error("Failed to copy image:", zap.String("image", imageName), zap.Error(err))
-		processedErrorsCounter.Inc()
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
 	// Move the image name from 'processing' to 'toscan'
 	_, err = rdb.LRem(ctx, "processing", 1, imageName).Result()
 	if err != nil {
-		logger.Error("Error removing image from processing queue:", zap.Error(err))
-		processedErrorsCounter.Inc()
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
@@ -133,9 +128,7 @@ func processQueue() {
 	err = rdb.LPush(ctx, "toscan", toScanString).Err()
 
 	if err != nil {
-		logger.Error("Error pushing image to toscan queue:", zap.Error(err))
-		processedErrorsCounter.Inc()
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
