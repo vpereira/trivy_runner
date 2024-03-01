@@ -169,4 +169,5 @@ func sendToWebhook(webhookURL string, result ScanResult, imageName string) {
 		return
 	}
 	logger.Info("Report sent successfully for image:", zap.String("imageName", imageName))
+	processedOpsCounter.Inc()
 }
