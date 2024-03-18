@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/go-redis/redismock/v9"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/vpereira/trivy_runner/internal/metrics"
 )
 
 func TestHandleScan(t *testing.T) {
@@ -20,6 +22,23 @@ func TestHandleScan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	prometheusMetrics = metrics.NewMetrics(
+		prometheus.CounterOpts{
+			Name: "pullworker_processed_ops_total",
+			Help: "Total number of processed operations by the pullworker.",
+		},
+		prometheus.CounterOpts{
+			Name: "pullworker_processed_errors_total",
+			Help: "Total number of processed errors by the pullworker.",
+		},
+	)
+
+	prometheusMetrics.Register()
+
+	// Ensure to unregister metrics to avoid pollution across tests
+	defer prometheus.Unregister(prometheusMetrics.ProcessedOpsCounter)
+	defer prometheus.Unregister(prometheusMetrics.ProcessedErrorsCounter)
 
 	rr := httptest.NewRecorder()
 	handler := http.HandlerFunc(handleScan)
@@ -37,9 +56,27 @@ func TestHandleScan(t *testing.T) {
 
 func TestHandleHealth(t *testing.T) {
 	req, err := http.NewRequest("GET", "/health", nil)
+
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	prometheusMetrics = metrics.NewMetrics(
+		prometheus.CounterOpts{
+			Name: "pullworker_processed_ops_total",
+			Help: "Total number of processed operations by the pullworker.",
+		},
+		prometheus.CounterOpts{
+			Name: "pullworker_processed_errors_total",
+			Help: "Total number of processed errors by the pullworker.",
+		},
+	)
+
+	prometheusMetrics.Register()
+
+	// Ensure to unregister metrics to avoid pollution across tests
+	defer prometheus.Unregister(prometheusMetrics.ProcessedOpsCounter)
+	defer prometheus.Unregister(prometheusMetrics.ProcessedErrorsCounter)
 
 	rr := httptest.NewRecorder()
 	handler := http.HandlerFunc(handleHealth)
