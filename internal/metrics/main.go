@@ -30,10 +30,6 @@ func (m *Metrics) Register() {
 	prometheus.MustRegister(m.ProcessedErrorsCounter)
 }
 
-func (m *Metrics) GetProcessedErrorsCounter() prometheus.Counter {
-	return m.ProcessedErrorsCounter
-}
-
 // IncOpsProcessed increments the processed operations counter.
 func (m *Metrics) IncOpsProcessed() {
 	m.ProcessedOpsCounter.Inc()

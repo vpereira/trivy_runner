@@ -56,7 +56,7 @@ func main() {
 
 	prometheusMetrics.Register()
 
-	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.GetProcessedErrorsCounter(), airbrakeNotifier)
+	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, airbrakeNotifier)
 
 	rdb = redisutil.InitializeClient()
 
