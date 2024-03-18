@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/error_handler"
+	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"go.uber.org/zap"
 )
@@ -26,19 +26,12 @@ type ScanResult struct {
 }
 
 var (
-	ctx                 = context.Background()
-	rdb                 *redis.Client
-	logger              *zap.Logger
-	airbrakeNotifier    *airbrake.AirbrakeNotifier
-	errorHandler        *error_handler.ErrorHandler
-	processedOpsCounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "pushworker_processed_ops_total",
-		Help: "Total number of processed operations by the pushworker.",
-	})
-	processedErrorsCounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "pushworker_processed_errors_total",
-		Help: "Total number of processed errors by the pushworker.",
-	})
+	ctx               = context.Background()
+	rdb               *redis.Client
+	logger            *zap.Logger
+	airbrakeNotifier  *airbrake.AirbrakeNotifier
+	errorHandler      *error_handler.ErrorHandler
+	prometheusMetrics *metrics.Metrics
 )
 
 func main() {
@@ -57,7 +50,20 @@ func main() {
 		logger.Error("Failed to create airbrake notifier")
 	}
 
-	errorHandler = error_handler.NewErrorHandler(logger, processedErrorsCounter, airbrakeNotifier)
+	prometheusMetrics = metrics.NewMetrics(
+		prometheus.CounterOpts{
+			Name: "pushworker_processed_ops_total",
+			Help: "Total number of processed operations by the pushworker.",
+		},
+		prometheus.CounterOpts{
+			Name: "pushworker_processed_errors_total",
+			Help: "Total number of processed errors by the pushworker.",
+		},
+	)
+
+	prometheusMetrics.Register()
+
+	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, airbrakeNotifier)
 
 	webhookURL := os.Getenv("WEBHOOK_URL")
 
@@ -67,16 +73,7 @@ func main() {
 
 	rdb = redisutil.InitializeClient()
 
-	prometheus.MustRegister(processedOpsCounter)
-	prometheus.MustRegister(processedErrorsCounter)
-
-	// Expose the registered metrics via HTTP.
-	http.Handle("/metrics", promhttp.Handler())
-
-	go func() {
-		logger.Info("Server started on :8083")
-		log.Fatal(http.ListenAndServe(":8083", nil))
-	}()
+	go metrics.StartMetricsServer("8083")
 
 	for {
 		processQueue(webhookURL)
@@ -169,5 +166,5 @@ func sendToWebhook(webhookURL string, result ScanResult, imageName string) {
 		return
 	}
 	logger.Info("Report sent successfully for image:", zap.String("imageName", imageName))
-	processedOpsCounter.Inc()
+	prometheusMetrics.IncOpsProcessed()
 }
