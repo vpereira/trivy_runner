@@ -4,34 +4,26 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/error_handler"
+	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"go.uber.org/zap"
 )
 
 var (
-	ctx                 = context.Background()
-	rdb                 *redis.Client
-	airbrakeNotifier    *airbrake.AirbrakeNotifier
-	errorHandler        *error_handler.ErrorHandler
-	imagesAppDir        string
-	logger              *zap.Logger
-	processedOpsCounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "pullworker_processed_ops_total",
-		Help: "Total number of processed operations by the pullworker.",
-	})
-	processedErrorsCounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "pullworker_processed_errors_total",
-		Help: "Total number of processed errors by the pullworker.",
-	})
+	ctx               = context.Background()
+	rdb               *redis.Client
+	airbrakeNotifier  *airbrake.AirbrakeNotifier
+	errorHandler      *error_handler.ErrorHandler
+	imagesAppDir      string
+	logger            *zap.Logger
+	prometheusMetrics *metrics.Metrics
 )
 
 func main() {
@@ -51,7 +43,20 @@ func main() {
 		logger.Error("Failed to create airbrake notifier")
 	}
 
-	errorHandler = error_handler.NewErrorHandler(logger, processedErrorsCounter, airbrakeNotifier)
+	prometheusMetrics = metrics.NewMetrics(
+		prometheus.CounterOpts{
+			Name: "pullworker_processed_ops_total",
+			Help: "Total number of processed operations by the pullworker.",
+		},
+		prometheus.CounterOpts{
+			Name: "pullworker_processed_errors_total",
+			Help: "Total number of processed errors by the pullworker.",
+		},
+	)
+
+	prometheusMetrics.Register()
+
+	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.GetProcessedErrorsCounter(), airbrakeNotifier)
 
 	rdb = redisutil.InitializeClient()
 
@@ -64,15 +69,8 @@ func main() {
 		airbrakeNotifier.NotifyAirbrake(err)
 	}
 
-	prometheus.MustRegister(processedOpsCounter)
-	prometheus.MustRegister(processedErrorsCounter)
-
-	// Expose the registered metrics via HTTP.
-	http.Handle("/metrics", promhttp.Handler())
-	go func() {
-		logger.Info("Server started on :8082")
-		log.Fatal(http.ListenAndServe(":8082", nil))
-	}()
+	// Start the metrics server in a separate goroutine
+	go metrics.StartMetricsServer("8082")
 
 	// Start processing loop
 	for {
@@ -132,7 +130,7 @@ func processQueue() {
 		return
 	}
 
-	processedOpsCounter.Inc()
+	prometheusMetrics.IncOpsProcessed()
 }
 
 // GenerateSkopeoCmdArgs generates the command line arguments for the skopeo command based on environment variables and input parameters.
