@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
@@ -17,13 +18,18 @@ import (
 )
 
 var (
-	ctx               = context.Background()
-	rdb               *redis.Client
-	airbrakeNotifier  *airbrake.AirbrakeNotifier
-	errorHandler      *error_handler.ErrorHandler
-	imagesAppDir      string
-	logger            *zap.Logger
-	prometheusMetrics *metrics.Metrics
+	ctx                       = context.Background()
+	rdb                       *redis.Client
+	airbrakeNotifier          *airbrake.AirbrakeNotifier
+	errorHandler              *error_handler.ErrorHandler
+	imagesAppDir              string
+	logger                    *zap.Logger
+	prometheusMetrics         *metrics.Metrics
+	commandExecutionHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "skopeo_execution_duration_seconds",
+		Help:    "Duration of skopeo execution.",
+		Buckets: prometheus.LinearBuckets(0.1, 0.2, 20),
+	}, []string{"skopeo"})
 )
 
 func main() {
@@ -52,6 +58,7 @@ func main() {
 			Name: "pullworker_processed_errors_total",
 			Help: "Total number of processed errors by the pullworker.",
 		},
+		commandExecutionHistogram,
 	)
 
 	prometheusMetrics.Register()
@@ -105,12 +112,17 @@ func processQueue() {
 	logger.Info("Target directory: ", zap.String("targetDir", targetDir))
 
 	cmdArgs := GenerateSkopeoCmdArgs(imageName, targetDir)
+
+	startTime := time.Now()
+
 	cmd := exec_command.NewExecShellCommander("skopeo", cmdArgs...)
 
 	if _, err := cmd.Output(); err != nil {
 		errorHandler.Handle(err)
 		return
 	}
+
+	duration := time.Since(startTime).Seconds()
 
 	// Move the image name from 'processing' to 'toscan'
 	_, err = rdb.LRem(ctx, "processing", 1, imageName).Result()
@@ -129,7 +141,7 @@ func processQueue() {
 		errorHandler.Handle(err)
 		return
 	}
-
+	prometheusMetrics.CommandExecutionDurationHistogram.WithLabelValues("skopeo").Observe(duration)
 	prometheusMetrics.IncOpsProcessed()
 }
 
