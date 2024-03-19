@@ -12,22 +12,30 @@ import (
 
 // Metrics holds the Prometheus metrics counters.
 type Metrics struct {
-	ProcessedOpsCounter    prometheus.Counter
-	ProcessedErrorsCounter prometheus.Counter
+	ProcessedOpsCounter               prometheus.Counter
+	ProcessedErrorsCounter            prometheus.Counter
+	CommandExecutionDurationHistogram *prometheus.HistogramVec // Optional
 }
 
-// NewMetrics initializes and returns a new Metrics instance with the provided counter options.
-func NewMetrics(opsCounterOpts, errorsCounterOpts prometheus.CounterOpts) *Metrics {
-	return &Metrics{
+func NewMetrics(opsCounterOpts, errorsCounterOpts prometheus.CounterOpts, optionalMetrics ...*prometheus.HistogramVec) *Metrics {
+	m := &Metrics{
 		ProcessedOpsCounter:    prometheus.NewCounter(opsCounterOpts),
 		ProcessedErrorsCounter: prometheus.NewCounter(errorsCounterOpts),
 	}
+
+	if len(optionalMetrics) > 0 && optionalMetrics[0] != nil {
+		m.CommandExecutionDurationHistogram = optionalMetrics[0]
+	}
+
+	return m
 }
 
-// Register registers the Prometheus counters with the default registry.
+// Register registers the Prometheus counters (and optional histogram) with the default registry.
 func (m *Metrics) Register() {
-	prometheus.MustRegister(m.ProcessedOpsCounter)
-	prometheus.MustRegister(m.ProcessedErrorsCounter)
+	prometheus.MustRegister(m.ProcessedOpsCounter, m.ProcessedErrorsCounter)
+	if m.CommandExecutionDurationHistogram != nil {
+		prometheus.MustRegister(m.CommandExecutionDurationHistogram)
+	}
 }
 
 // IncOpsProcessed increments the processed operations counter.

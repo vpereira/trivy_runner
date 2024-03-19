@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
@@ -19,13 +20,18 @@ import (
 )
 
 var (
-	ctx               = context.Background()
-	rdb               *redis.Client
-	airbrakeNotifier  *airbrake.AirbrakeNotifier
-	reportsAppDir     string
-	errorHandler      *error_handler.ErrorHandler
-	logger            *zap.Logger
-	prometheusMetrics *metrics.Metrics
+	ctx                       = context.Background()
+	rdb                       *redis.Client
+	airbrakeNotifier          *airbrake.AirbrakeNotifier
+	reportsAppDir             string
+	errorHandler              *error_handler.ErrorHandler
+	logger                    *zap.Logger
+	prometheusMetrics         *metrics.Metrics
+	commandExecutionHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "trivy_execution_duration_seconds",
+		Help:    "Duration of trivy execution.",
+		Buckets: prometheus.LinearBuckets(0.1, 0.2, 20),
+	}, []string{"trivy"})
 )
 
 func main() {
@@ -53,6 +59,7 @@ func main() {
 			Name: "scanworker_processed_errors_total",
 			Help: "Total number of processed errors by the scanworker.",
 		},
+		commandExecutionHistogram,
 	)
 
 	prometheusMetrics.Register()
@@ -109,6 +116,7 @@ func processQueue() {
 
 	cmdArgs := generateTrivyCmdArgs(resultFileName, targetDir)
 
+	startTime := time.Now()
 	cmd := exec_command.NewExecShellCommander("trivy", cmdArgs...)
 
 	if _, err := cmd.Output(); err != nil {
@@ -116,6 +124,7 @@ func processQueue() {
 		return
 	}
 
+	duration := time.Since(startTime).Seconds()
 	logger.Info("Scan complete for image:", zap.String("image", imageName), zap.String("json_report", resultFileName))
 
 	if os.Getenv("PUSH_TO_CATALOG") != "" {
@@ -125,6 +134,7 @@ func processQueue() {
 			return
 		}
 	}
+	prometheusMetrics.CommandExecutionDurationHistogram.WithLabelValues("trivy").Observe(duration)
 	prometheusMetrics.IncOpsProcessed()
 }
 

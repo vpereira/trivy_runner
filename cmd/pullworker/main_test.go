@@ -42,6 +42,7 @@ func TestProcessQueue(t *testing.T) {
 			Name: "pullworker_processed_errors_total",
 			Help: "Total number of processed errors by the pullworker.",
 		},
+		commandExecutionHistogram,
 	)
 
 	prometheusMetrics.Register()
@@ -49,6 +50,7 @@ func TestProcessQueue(t *testing.T) {
 	// Ensure to unregister metrics to avoid pollution across tests
 	defer prometheus.Unregister(prometheusMetrics.ProcessedOpsCounter)
 	defer prometheus.Unregister(prometheusMetrics.ProcessedErrorsCounter)
+	defer prometheus.Unregister(commandExecutionHistogram)
 
 	processQueue()
 }
