@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
+	"github.com/vpereira/trivy_runner/internal/metrics"
 	"go.uber.org/zap"
 )
 
@@ -51,6 +53,23 @@ func TestProcessQueue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	prometheusMetrics = metrics.NewMetrics(
+		prometheus.CounterOpts{
+			Name: "pushworker_processed_ops_total",
+			Help: "Total number of processed operations by the pushworker.",
+		},
+		prometheus.CounterOpts{
+			Name: "pushworker_processed_errors_total",
+			Help: "Total number of processed errors by the pushworker.",
+		},
+	)
+
+	prometheusMetrics.Register()
+
+	// Ensure to unregister metrics to avoid pollution across tests
+	defer prometheus.Unregister(prometheusMetrics.ProcessedOpsCounter)
+	defer prometheus.Unregister(prometheusMetrics.ProcessedErrorsCounter)
 
 	// Call the function to process the queue
 	processQueue(webhookServer.URL)

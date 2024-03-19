@@ -10,31 +10,22 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/logging"
+	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/pkg/utils"
 )
 
-var logger *zap.Logger
-
-var ctx = context.Background()
-var rdb *redis.Client
-
-var airbrakeNotifier *airbrake.AirbrakeNotifier
-
-var opsProcessed = promauto.NewCounter(prometheus.CounterOpts{
-	Name: "webapi_processed_ops_total",
-	Help: "The total number of processed events",
-})
-
-var opsProcessedError = promauto.NewCounter(prometheus.CounterOpts{
-	Name: "webapi_processed_errors_total",
-	Help: "The total number of errors while processing events",
-})
+var (
+	logger            *zap.Logger
+	ctx               = context.Background()
+	rdb               *redis.Client
+	airbrakeNotifier  *airbrake.AirbrakeNotifier
+	prometheusMetrics *metrics.Metrics
+)
 
 func main() {
 	var err error
@@ -54,6 +45,17 @@ func main() {
 
 	rdb = redisutil.InitializeClient()
 
+	prometheusMetrics = metrics.NewMetrics(
+		prometheus.CounterOpts{
+			Name: "webapi_processed_ops_total",
+			Help: "Total number of processed operations by the webapi.",
+		},
+		prometheus.CounterOpts{
+			Name: "webapi_processed_errors_total",
+			Help: "Total number of processed errors by the webapi.",
+		},
+	)
+	prometheusMetrics.Register()
 	// Setup HTTP server
 	http.Handle("/health", logging.LoggingMiddleware(http.HandlerFunc(handleHealth)))
 	http.Handle("/metrics", promhttp.Handler())
@@ -76,7 +78,7 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	imageName := r.URL.Query().Get("image")
 	if imageName == "" {
 		http.Error(w, "Image name is required", http.StatusBadRequest)
-		go increasePrometheusErrors()
+		go prometheusMetrics.IncOpsProcessedErrors()
 		return
 	}
 
@@ -87,7 +89,7 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Report not found"})
-		go increasePrometheusErrors()
+		go prometheusMetrics.IncOpsProcessedErrors()
 		return
 	}
 
@@ -95,7 +97,7 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	report, err := os.ReadFile(filePath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		go increasePrometheusErrors()
+		go prometheusMetrics.IncOpsProcessedErrors()
 		return
 	}
 
@@ -108,7 +110,7 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 	imageName := r.URL.Query().Get("image")
 	if imageName == "" {
 		http.Error(w, "Image name is required", http.StatusBadRequest)
-		go increasePrometheusErrors()
+		go prometheusMetrics.IncOpsProcessedErrors()
 		return
 	}
 
@@ -116,25 +118,17 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 	err := rdb.LPush(ctx, "topull", imageName).Err()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		go increasePrometheusErrors()
+		go prometheusMetrics.IncOpsProcessedErrors()
 		logger.Error("Failed to push image to queue", zap.String("image", imageName), zap.Error(err))
 		airbrakeNotifier.NotifyAirbrake(err)
 		return
 	}
 
 	// Increment Prometheus counter in a goroutine
-	go increasePrometheusCounter()
+	go prometheusMetrics.IncOpsProcessed()
 
 	// Respond with the path for the result
 	filePath := utils.ImageToFilename(imageName)
 	response := map[string]string{"resultPath": filePath}
 	json.NewEncoder(w).Encode(response)
-}
-
-func increasePrometheusCounter() {
-	opsProcessed.Inc()
-}
-
-func increasePrometheusErrors() {
-	opsProcessedError.Inc()
 }
