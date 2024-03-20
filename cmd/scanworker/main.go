@@ -77,7 +77,7 @@ func main() {
 		airbrakeNotifier.NotifyAirbrake(err)
 	}
 
-	metrics.StartMetricsServer("8081")
+	go metrics.StartMetricsServer("8081")
 
 	// Start processing loop
 	for {
