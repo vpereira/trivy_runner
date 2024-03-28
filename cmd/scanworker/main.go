@@ -145,5 +145,15 @@ func calculateResultName(imageName string) string {
 }
 
 func generateTrivyCmdArgs(resultFileName, targetDir string) []string {
-	return []string{"image", "--format", "json", "--output", resultFileName, "--input", targetDir}
+	cmdArgs := []string{"image"}
+
+	// Check if SLOW_RUN environment variable is set to "1" and add "--slow" parameter
+	slowRun := redisutil.GetEnv("SLOW_RUN", "0")
+	if slowRun == "1" {
+		cmdArgs = append(cmdArgs, "--slow")
+	}
+
+	cmdArgs = append(cmdArgs, "--format", "json", "--output", resultFileName, "--input", targetDir)
+
+	return cmdArgs
 }
