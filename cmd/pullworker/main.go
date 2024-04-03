@@ -122,7 +122,7 @@ func processQueue() {
 		return
 	}
 
-	duration := time.Since(startTime).Seconds()
+	executionTime := time.Since(startTime).Seconds()
 
 	// Move the image name from 'processing' to 'toscan'
 	_, err = rdb.LRem(ctx, "processing", 1, imageName).Result()
@@ -141,7 +141,7 @@ func processQueue() {
 		errorHandler.Handle(err)
 		return
 	}
-	prometheusMetrics.CommandExecutionDurationHistogram.WithLabelValues("skopeo").Observe(duration)
+	prometheusMetrics.CommandExecutionDurationHistogram.WithLabelValues(imageName).Observe(executionTime)
 	prometheusMetrics.IncOpsProcessed()
 }
 

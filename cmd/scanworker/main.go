@@ -124,7 +124,7 @@ func processQueue() {
 		return
 	}
 
-	duration := time.Since(startTime).Seconds()
+	executionTime := time.Since(startTime).Seconds()
 	logger.Info("Scan complete for image:", zap.String("image", imageName), zap.String("json_report", resultFileName))
 
 	if os.Getenv("PUSH_TO_CATALOG") != "" {
@@ -134,7 +134,7 @@ func processQueue() {
 			return
 		}
 	}
-	prometheusMetrics.CommandExecutionDurationHistogram.WithLabelValues("trivy").Observe(duration)
+	prometheusMetrics.CommandExecutionDurationHistogram.WithLabelValues(imageName).Observe(executionTime)
 	prometheusMetrics.IncOpsProcessed()
 }
 
