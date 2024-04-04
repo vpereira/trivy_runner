@@ -17,12 +17,21 @@ func (m *MockAirbrakeNotifier) NotifyAirbrake(err error) {
 	m.NotifyCallCount++
 }
 
+type MockSentryNotifier struct {
+	NotifyCallCount int
+}
+
+func (m *MockSentryNotifier) NotifySentry(err error) {
+	m.NotifyCallCount++
+}
+
 func TestErrorHandler_Handle(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	errorsCounter := prometheus.NewCounter(prometheus.CounterOpts{})
 	mockAirbrake := &MockAirbrakeNotifier{}
+	mockSentry := &MockSentryNotifier{}
 
-	handler := NewErrorHandler(logger, errorsCounter, mockAirbrake)
+	handler := NewErrorHandler(logger, errorsCounter, mockAirbrake, mockSentry)
 
 	testError := errors.New("test error")
 	handler.Handle(testError)
@@ -33,5 +42,9 @@ func TestErrorHandler_Handle(t *testing.T) {
 
 	if mockAirbrake.NotifyCallCount != 1 {
 		t.Errorf("Expected Airbrake to be notified once, got %d", mockAirbrake.NotifyCallCount)
+	}
+
+	if mockSentry.NotifyCallCount != 1 {
+		t.Errorf("Expected Sentry to be notified once, got %d", mockSentry.NotifyCallCount)
 	}
 }

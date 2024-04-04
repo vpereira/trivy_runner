@@ -16,6 +16,7 @@ import (
 	"github.com/vpereira/trivy_runner/internal/error_handler"
 	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
+	"github.com/vpereira/trivy_runner/internal/sentry"
 	"go.uber.org/zap"
 )
 
@@ -30,6 +31,7 @@ var (
 	rdb               *redis.Client
 	logger            *zap.Logger
 	airbrakeNotifier  *airbrake.AirbrakeNotifier
+	sentryNotifier    *sentry.SentryNotifier
 	errorHandler      *error_handler.ErrorHandler
 	prometheusMetrics *metrics.Metrics
 )
@@ -50,6 +52,12 @@ func main() {
 		logger.Error("Failed to create airbrake notifier")
 	}
 
+	sentryNotifier = sentry.NewSentryNotifier()
+
+	if sentryNotifier == nil {
+		logger.Error("Failed to create sentry notifier")
+	}
+
 	prometheusMetrics = metrics.NewMetrics(
 		prometheus.CounterOpts{
 			Name: "pushworker_processed_ops_total",
@@ -63,7 +71,7 @@ func main() {
 
 	prometheusMetrics.Register()
 
-	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, airbrakeNotifier)
+	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, airbrakeNotifier, sentryNotifier)
 
 	webhookURL := os.Getenv("WEBHOOK_URL")
 

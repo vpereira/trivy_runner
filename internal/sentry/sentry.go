@@ -38,9 +38,8 @@ func NewSentryNotifier() *SentryNotifier {
 
 func (s *SentryNotifier) NotifySentry(err error) {
 	if s.Enabled && err != nil {
-		sentry.WithScope(func(scope *sentry.Scope) {
-			sentry.CaptureException(err)
-		})
+		log.Printf("Sending error to Sentry: %s", err)
+		sentry.CaptureException(err)
 		sentry.Flush(5 * time.Second)
 	}
 }

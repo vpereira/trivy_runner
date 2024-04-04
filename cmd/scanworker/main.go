@@ -15,6 +15,7 @@ import (
 	"github.com/vpereira/trivy_runner/internal/error_handler"
 	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
+	"github.com/vpereira/trivy_runner/internal/sentry"
 	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"go.uber.org/zap"
 )
@@ -23,6 +24,7 @@ var (
 	ctx                       = context.Background()
 	rdb                       *redis.Client
 	airbrakeNotifier          *airbrake.AirbrakeNotifier
+	sentryNotifier            *sentry.SentryNotifier
 	reportsAppDir             string
 	errorHandler              *error_handler.ErrorHandler
 	logger                    *zap.Logger
@@ -50,6 +52,12 @@ func main() {
 		logger.Error("Failed to create airbrake notifier")
 	}
 
+	sentryNotifier = sentry.NewSentryNotifier()
+
+	if sentryNotifier == nil {
+		logger.Error("Failed to create sentry notifier")
+	}
+
 	prometheusMetrics = metrics.NewMetrics(
 		prometheus.CounterOpts{
 			Name: "scanworker_processed_ops_total",
@@ -64,7 +72,7 @@ func main() {
 
 	prometheusMetrics.Register()
 
-	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, airbrakeNotifier)
+	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, airbrakeNotifier, sentryNotifier)
 
 	rdb = redisutil.InitializeClient()
 
