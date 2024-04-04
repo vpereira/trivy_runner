@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/airbrake/gobrake/v5 v5.6.1
 	github.com/alicebob/miniredis/v2 v2.31.1
+	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/prometheus/client_golang v1.19.0
 	github.com/redis/go-redis/v9 v9.5.1
@@ -26,5 +27,6 @@ require (
 	github.com/yuin/gopher-lua v1.1.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/sys v0.16.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
 )
