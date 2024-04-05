@@ -119,6 +119,7 @@ func processQueue() {
 	// Sanitize the image name to create a valid filename
 	resultFileName := calculateResultName(imageName)
 
+	// when I add it here it b0rks???
 	logger.Info("Scanning image:", zap.String("image", imageName))
 	logger.Info("Saving results to:", zap.String("json_report", resultFileName))
 
@@ -128,6 +129,9 @@ func processQueue() {
 	cmd := exec_command.NewExecShellCommander("trivy", cmdArgs...)
 
 	if _, err := cmd.Output(); err != nil {
+		if sentryNotifier != nil {
+			sentryNotifier.AddTag("gun", imageName)
+		}
 		errorHandler.Handle(err)
 		return
 	}

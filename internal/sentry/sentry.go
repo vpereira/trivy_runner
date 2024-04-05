@@ -14,7 +14,9 @@ type SentryNotifier struct {
 
 type Notifier interface {
 	NotifySentry(err error)
+	AddTag(name string, value string)
 }
+
 
 // NewSentryNotifier initializes the Sentry client with the DSN from the environment variable.
 func NewSentryNotifier() *SentryNotifier {
@@ -42,4 +44,13 @@ func (s *SentryNotifier) NotifySentry(err error) {
 		sentry.CaptureException(err)
 		sentry.Flush(5 * time.Second)
 	}
+}
+
+func (s *SentryNotifier) AddTag(name string, value string) {
+	if s.Enabled {
+		return;
+	}
+	sentry.ConfigureScope(func(scope *sentry.Scope){
+		scope.SetTag(name, value);
+	})
 }

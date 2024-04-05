@@ -117,6 +117,7 @@ func processQueue() {
 		return
 	}
 
+	// when I add it here it b0rks???
 	logger.Info("Processing image: ", zap.String("imageName", imageName))
 	logger.Info("Target directory: ", zap.String("targetDir", targetDir))
 	logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
@@ -128,6 +129,10 @@ func processQueue() {
 	cmd := exec_command.NewExecShellCommander("skopeo", cmdArgs...)
 
 	if _, err := cmd.Output(); err != nil {
+		if sentryNotifier != nil {
+			sentryNotifier.AddTag("gun", imageName)
+		}
+
 		errorHandler.Handle(err)
 		return
 	}
