@@ -15,6 +15,7 @@ import (
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/internal/sentry"
 	"github.com/vpereira/trivy_runner/pkg/exec_command"
+	"github.com/vpereira/trivy_runner/pkg/pull_worker"
 	"go.uber.org/zap"
 )
 
@@ -32,6 +33,7 @@ var (
 		Help:    "Duration of skopeo execution.",
 		Buckets: prometheus.LinearBuckets(1, 0.5, 20),
 	}, []string{"skopeo"})
+	shellRunner = exec_command.NewExecShellCommander("dumb", "dumb")
 )
 
 func main() {
@@ -119,13 +121,10 @@ func processQueue() {
 	logger.Info("Processing image: ", zap.String("imageName", imageName))
 	logger.Info("Target directory: ", zap.String("targetDir", targetDir))
 
-	cmdArgs := GenerateSkopeoCmdArgs(imageName, targetDir)
-
+	puller := pull_worker.NewPuller(shellRunner)
 	startTime := time.Now()
 
-	cmd := exec_command.NewExecShellCommander("skopeo", cmdArgs...)
-
-	if _, err := cmd.Output(); err != nil {
+	if err := puller.Pull(imageName, targetDir); err != nil {
 		errorHandler.Handle(err)
 		return
 	}

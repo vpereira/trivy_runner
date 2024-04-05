@@ -5,20 +5,24 @@ import (
 )
 
 type IShellCommand interface {
-	SetDir(string)
 	Output() ([]byte, error)
-	Wait() error
+	NewCommand(string, ...string)
 }
 
 type execShellCommand struct {
-	*exec.Cmd
+	cmd *exec.Cmd
 }
 
-func (exc execShellCommand) SetDir(dir string) {
-	exc.Dir = dir
+func (e *execShellCommand) Output() ([]byte, error) {
+	return e.cmd.Output()
+}
+
+func (e *execShellCommand) NewCommand(name string, arg ...string) {
+	e.cmd = exec.Command(name, arg...)
 }
 
 func NewExecShellCommander(name string, arg ...string) IShellCommand {
-	execCmd := exec.Command(name, arg...)
-	return execShellCommand{Cmd: execCmd}
+	shellcmd := &execShellCommand{}
+	shellcmd.NewCommand(name, arg...)
+	return shellcmd
 }
