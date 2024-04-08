@@ -48,9 +48,9 @@ func (s *SentryNotifier) NotifySentry(err error) {
 
 func (s *SentryNotifier) AddTag(name string, value string) {
 	if s.Enabled {
-		return;
+		return
 	}
-	sentry.ConfigureScope(func(scope *sentry.Scope){
-		scope.SetTag(name, value);
+	sentry.ConfigureScope(func(scope *sentry.Scope) {
+		scope.SetTag(name, value)
 	})
 }
