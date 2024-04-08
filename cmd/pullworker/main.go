@@ -43,7 +43,7 @@ func main() {
 		log.Fatal("Failed to create logger:", err)
 	}
 
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
 
 	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
 
@@ -103,6 +103,7 @@ func processQueue() {
 	}
 
 	targetDir, err := os.MkdirTemp(imagesAppDir, "trivy-scan-*")
+	tarballFilename := fmt.Sprintf("%s/image.tar", targetDir)
 
 	if err != nil {
 		errorHandler.Handle(err)
@@ -118,8 +119,9 @@ func processQueue() {
 
 	logger.Info("Processing image: ", zap.String("imageName", imageName))
 	logger.Info("Target directory: ", zap.String("targetDir", targetDir))
+	logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
 
-	cmdArgs := GenerateSkopeoCmdArgs(imageName, targetDir)
+	cmdArgs := GenerateSkopeoCmdArgs(imageName, tarballFilename)
 
 	startTime := time.Now()
 
@@ -139,7 +141,7 @@ func processQueue() {
 		return
 	}
 
-	toScanString := fmt.Sprintf("%s|%s", imageName, targetDir)
+	toScanString := fmt.Sprintf("%s|%s", imageName, tarballFilename)
 
 	logger.Info("Pushing image to toscan queue:", zap.String("image", toScanString))
 
@@ -154,7 +156,7 @@ func processQueue() {
 }
 
 // GenerateSkopeoCmdArgs generates the command line arguments for the skopeo command based on environment variables and input parameters.
-func GenerateSkopeoCmdArgs(imageName, targetDir string) []string {
+func GenerateSkopeoCmdArgs(imageName, targetFilename string) []string {
 	cmdArgs := []string{"copy", "--remove-signatures"}
 
 	// Check and add registry credentials if they are set
@@ -166,7 +168,7 @@ func GenerateSkopeoCmdArgs(imageName, targetDir string) []string {
 	}
 
 	// Add the rest of the command
-	cmdArgs = append(cmdArgs, fmt.Sprintf("docker://%s", imageName), "oci://"+targetDir)
+	cmdArgs = append(cmdArgs, fmt.Sprintf("docker://%s", imageName), fmt.Sprintf("docker-archive://%s", targetFilename))
 
 	return cmdArgs
 }
