@@ -17,7 +17,6 @@ type Notifier interface {
 	AddTag(name string, value string)
 }
 
-
 // NewSentryNotifier initializes the Sentry client with the DSN from the environment variable.
 func NewSentryNotifier() *SentryNotifier {
 	dsn := os.Getenv("SENTRY_DSN")
@@ -25,9 +24,17 @@ func NewSentryNotifier() *SentryNotifier {
 		return &SentryNotifier{Enabled: false}
 	}
 
+	environment := os.Getenv("TRIVY_ENV")
+
+	if environment == "" {
+		environment = "development"
+	}
+
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn: dsn,
+		Dsn:         dsn,
+		Environment: environment,
 	})
+
 	if err != nil {
 		log.Fatalf("sentry.Init: %s", err)
 		return &SentryNotifier{Enabled: false}
