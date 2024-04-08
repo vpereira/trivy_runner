@@ -72,7 +72,7 @@ func TestGenerateSkopeoCmdArgs(t *testing.T) {
 			expectedResult: []string{
 				"copy", "--remove-signatures",
 				"docker://registry.example.com/myimage:latest",
-				"oci:///tmp/targetdir",
+				"docker-archive:///tmp/targetdir",
 			},
 		},
 		{
@@ -85,7 +85,7 @@ func TestGenerateSkopeoCmdArgs(t *testing.T) {
 				"copy", "--remove-signatures",
 				"--dest-username", "testuser", "--dest-password", "testpass",
 				"docker://registry.example.com/myimage:latest",
-				"oci:///tmp/targetdir",
+				"docker-archive:///tmp/targetdir",
 			},
 		},
 	}

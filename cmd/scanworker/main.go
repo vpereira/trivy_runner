@@ -111,10 +111,10 @@ func processQueue() {
 	}
 
 	imageName := parts[0]
-	targetDir := parts[1]
+	target := parts[1]
 
 	// Delete the image when we're done
-	defer os.RemoveAll(targetDir)
+	defer os.RemoveAll(target)
 
 	// Sanitize the image name to create a valid filename
 	resultFileName := calculateResultName(imageName)
@@ -122,7 +122,7 @@ func processQueue() {
 	logger.Info("Scanning image:", zap.String("image", imageName))
 	logger.Info("Saving results to:", zap.String("json_report", resultFileName))
 
-	cmdArgs := generateTrivyCmdArgs(resultFileName, targetDir)
+	cmdArgs := generateTrivyCmdArgs(resultFileName, target)
 
 	startTime := time.Now()
 	cmd := exec_command.NewExecShellCommander("trivy", cmdArgs...)
@@ -152,7 +152,7 @@ func calculateResultName(imageName string) string {
 	return filepath.Join(reportsAppDir, safeImageName+".json")
 }
 
-func generateTrivyCmdArgs(resultFileName, targetDir string) []string {
+func generateTrivyCmdArgs(resultFileName, target string) []string {
 	cmdArgs := []string{"image"}
 
 	// Check if SLOW_RUN environment variable is set to "1" and add "--slow" parameter
@@ -161,7 +161,7 @@ func generateTrivyCmdArgs(resultFileName, targetDir string) []string {
 		cmdArgs = append(cmdArgs, "--slow")
 	}
 
-	cmdArgs = append(cmdArgs, "--format", "json", "--output", resultFileName, "--input", targetDir)
+	cmdArgs = append(cmdArgs, "--format", "json", "--output", resultFileName, "--input", target)
 
 	return cmdArgs
 }
