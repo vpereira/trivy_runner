@@ -32,7 +32,7 @@ var (
 	commandExecutionHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "trivy_execution_duration_seconds",
 		Help:    "Duration of trivy execution.",
-		Buckets: prometheus.LinearBuckets(1, 0.5, 20),
+		Buckets: prometheus.LinearBuckets(0, 5, 20),
 	}, []string{"trivy"})
 )
 
