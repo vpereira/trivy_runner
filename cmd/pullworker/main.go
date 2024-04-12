@@ -34,6 +34,12 @@ var (
 	}, []string{"skopeo"})
 )
 
+type imageProcessResult struct {
+	queueName string
+	imageName string
+	err       error
+}
+
 func main() {
 	var err error
 
@@ -87,72 +93,88 @@ func main() {
 	// Start the metrics server in a separate goroutine
 	go metrics.StartMetricsServer("8082")
 
-	// Start processing loop
-	for {
-		processQueue()
+	processedImages := make(chan imageProcessResult)
+
+	// Start listening on both queues in separate goroutines
+	go listenQueue("topull", processedImages)
+	go listenQueue("getsize", processedImages)
+
+	// Process results from both queues as they come in
+	for result := range processedImages {
+		if result.err != nil {
+			errorHandler.Handle(result.err)
+		} else {
+			logger.Info("Processed image", zap.String("imageName", result.imageName),
+				zap.String("fromQueue", result.queueName), zap.String("status", "success"))
+		}
 	}
 }
 
-func processQueue() {
-	// Block until an image name is available in the 'topull' queue
-	result, err := rdb.BRPopLPush(ctx, "topull", "processing", 0).Result()
+func listenQueue(queueName string, processed chan<- imageProcessResult) {
+	for {
+		imageName, err := rdb.BRPopLPush(ctx, queueName, "processing", 0).Result()
+		if err != nil {
+			processed <- imageProcessResult{queueName: queueName, imageName: imageName, err: err}
+			continue
+		}
 
-	if err != nil {
-		errorHandler.Handle(err)
-		return
+		if imageName == "" {
+			processed <- imageProcessResult{queueName: queueName, imageName: imageName, err: fmt.Errorf("received empty image name from queue")}
+			continue
+		}
+
+		processImage(queueName, imageName, processed)
 	}
+}
 
+func processImage(queueName, imageName string, processed chan<- imageProcessResult) {
 	targetDir, err := os.MkdirTemp(imagesAppDir, "trivy-scan-*")
 	tarballFilename := fmt.Sprintf("%s/image.tar", targetDir)
 
 	if err != nil {
-		errorHandler.Handle(err)
+		processed <- imageProcessResult{queueName: queueName, imageName: imageName, err: err}
 		return
 	}
-
-	imageName := result
-
-	if imageName == "" {
-		errorHandler.Handle(err)
-		return
-	}
-
-	logger.Info("Processing image: ", zap.String("imageName", imageName))
-	logger.Info("Target directory: ", zap.String("targetDir", targetDir))
-	logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
 
 	cmdArgs := GenerateSkopeoCmdArgs(imageName, tarballFilename)
-
 	startTime := time.Now()
 
 	cmd := exec_command.NewExecShellCommander("skopeo", cmdArgs...)
 
 	if _, err := cmd.Output(); err != nil {
-		errorHandler.Handle(err)
+		processed <- imageProcessResult{queueName: queueName, imageName: imageName, err: err}
 		return
 	}
 
 	executionTime := time.Since(startTime).Seconds()
-
-	// Move the image name from 'processing' to 'toscan'
-	_, err = rdb.LRem(ctx, "processing", 1, imageName).Result()
-	if err != nil {
-		errorHandler.Handle(err)
-		return
-	}
-
-	toScanString := fmt.Sprintf("%s|%s", imageName, tarballFilename)
-
-	logger.Info("Pushing image to toscan queue:", zap.String("image", toScanString))
-
-	err = rdb.LPush(ctx, "toscan", toScanString).Err()
-
-	if err != nil {
-		errorHandler.Handle(err)
-		return
-	}
 	prometheusMetrics.CommandExecutionDurationHistogram.WithLabelValues(imageName).Observe(executionTime)
 	prometheusMetrics.IncOpsProcessed()
+
+	var pushQueue string
+	var pushData string
+
+	if queueName == "topull" {
+		pushQueue = "toscan"
+		pushData = fmt.Sprintf("%s|%s", imageName, tarballFilename)
+	} else { // "getsize"
+		info, err := os.Stat(tarballFilename)
+		if err != nil {
+			processed <- imageProcessResult{queueName: queueName, imageName: imageName, err: err}
+			return
+		}
+		size := info.Size()
+		pushQueue = "topush"
+		pushData = fmt.Sprintf("%s:%d", imageName, size)
+	}
+
+	err = rdb.LPush(ctx, pushQueue, pushData).Err()
+	if err != nil {
+		processed <- imageProcessResult{queueName: queueName, imageName: imageName, err: err}
+		return
+	}
+
+	// Send the successful process result to the main goroutine
+	processed <- imageProcessResult{queueName: queueName, imageName: imageName, err: nil}
 }
 
 // GenerateSkopeoCmdArgs generates the command line arguments for the skopeo command based on environment variables and input parameters.

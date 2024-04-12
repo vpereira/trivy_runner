@@ -60,6 +60,7 @@ func main() {
 	http.Handle("/health", logging.LoggingMiddleware(http.HandlerFunc(handleHealth)))
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/scan", logging.LoggingMiddleware(http.HandlerFunc(handleScan)))
+	http.Handle("/get-uncompressed-size", logging.LoggingMiddleware(http.HandlerFunc(handleGetUncompressedSize)))
 	http.Handle("/report", logging.LoggingMiddleware(http.HandlerFunc(handleReport)))
 	logger.Info("Server started on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
@@ -104,6 +105,31 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	// Set the content type and write the response
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(report)
+}
+
+func handleGetUncompressedSize(w http.ResponseWriter, r *http.Request) {
+	imageName := r.URL.Query().Get("image")
+	if imageName == "" {
+		http.Error(w, "Image name is required", http.StatusBadRequest)
+		go prometheusMetrics.IncOpsProcessedErrors()
+		return
+	}
+
+	// Push the image name to Redis
+	err := rdb.LPush(ctx, "getsize", imageName).Err()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		go prometheusMetrics.IncOpsProcessedErrors()
+		logger.Error("Failed to push image to queue", zap.String("image", imageName), zap.Error(err))
+		airbrakeNotifier.NotifyAirbrake(err)
+		return
+	}
+
+	// Increment Prometheus counter in a goroutine
+	go prometheusMetrics.IncOpsProcessed()
+
+	response := map[string]string{"result": "ok"}
+	json.NewEncoder(w).Encode(response)
 }
 
 func handleScan(w http.ResponseWriter, r *http.Request) {
