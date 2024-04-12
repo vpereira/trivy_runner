@@ -30,7 +30,7 @@ var (
 	commandExecutionHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "skopeo_execution_duration_seconds",
 		Help:    "Duration of skopeo execution.",
-		Buckets: prometheus.LinearBuckets(1, 0.5, 20),
+		Buckets: prometheus.LinearBuckets(0, 5, 20),
 	}, []string{"skopeo"})
 )
 
