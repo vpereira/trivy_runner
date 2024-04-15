@@ -22,7 +22,7 @@ var (
 	ctx                       = context.Background()
 	rdb                       *redis.Client
 	airbrakeNotifier          *airbrake.AirbrakeNotifier
-	sentryNotifier            *sentry.SentryNotifier
+	sentryNotifier            sentry.Notifier
 	errorHandler              *error_handler.ErrorHandler
 	imagesAppDir              string
 	logger                    *zap.Logger
@@ -117,6 +117,7 @@ func processQueue() {
 		return
 	}
 
+	sentryNotifier.AddTag("gun", imageName)
 	logger.Info("Processing image: ", zap.String("imageName", imageName))
 	logger.Info("Target directory: ", zap.String("targetDir", targetDir))
 	logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))

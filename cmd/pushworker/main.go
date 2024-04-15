@@ -38,7 +38,7 @@ var (
 	rdb               *redis.Client
 	logger            *zap.Logger
 	airbrakeNotifier  *airbrake.AirbrakeNotifier
-	sentryNotifier    *sentry.SentryNotifier
+	sentryNotifier    sentry.Notifier
 	errorHandler      *error_handler.ErrorHandler
 	prometheusMetrics *metrics.Metrics
 )

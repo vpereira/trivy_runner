@@ -19,10 +19,15 @@ func (m *MockAirbrakeNotifier) NotifyAirbrake(err error) {
 
 type MockSentryNotifier struct {
 	NotifyCallCount int
+	Tags            map[string]string
 }
 
 func (m *MockSentryNotifier) NotifySentry(err error) {
 	m.NotifyCallCount++
+}
+
+func (m *MockSentryNotifier) AddTag(key string, value string) {
+	m.Tags[key] = value
 }
 
 func TestErrorHandler_Handle(t *testing.T) {

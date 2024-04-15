@@ -22,7 +22,7 @@ var (
 	ctx                       = context.Background()
 	rdb                       *redis.Client
 	airbrakeNotifier          *airbrake.AirbrakeNotifier
-	sentryNotifier            *sentry.SentryNotifier
+	sentryNotifier            sentry.Notifier
 	errorHandler              *error_handler.ErrorHandler
 	imagesAppDir              string
 	logger                    *zap.Logger

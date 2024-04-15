@@ -10,7 +10,8 @@ func TestNewSentryNotifier(t *testing.T) {
 	t.Run("without DSN", func(t *testing.T) {
 		os.Unsetenv("SENTRY_DSN")
 		notifier := NewSentryNotifier()
-		if notifier.Enabled {
+
+		if notifier.(*SentryNotifier).Enabled {
 			t.Errorf("Expected SentryNotifier to be disabled when DSN is not set")
 		}
 	})
@@ -20,7 +21,7 @@ func TestNewSentryNotifier(t *testing.T) {
 		defer os.Unsetenv("SENTRY_DSN")
 
 		notifier := NewSentryNotifier()
-		if !notifier.Enabled {
+		if !notifier.(*SentryNotifier).Enabled {
 			t.Errorf("Expected SentryNotifier to be enabled when DSN is set")
 		}
 	})
