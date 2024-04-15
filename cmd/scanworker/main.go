@@ -114,7 +114,7 @@ func processQueue() {
 	target := parts[1]
 
 	sentryNotifier.AddTag("gun", imageName)
-	sentryNotifier.AddTag("target-dir", targetDir)
+	sentryNotifier.AddTag("target-dir", target)
 	// Delete the image when we're done
 	defer os.RemoveAll(target)
 
