@@ -39,7 +39,10 @@ func TestProcessQueue(t *testing.T) {
 	rdb = redis.NewClient(&redis.Options{
 		Addr: mr.Addr(),
 	})
-	_, err = rdb.RPush(ctx, "topull", "registry.suse.com/bci/bci-busybox:latest").Result()
+
+	gun := "registry.suse.com/bci/bci-busybox:latest"
+
+	_, err = rdb.RPush(ctx, "topull", gun).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +78,7 @@ func TestProcessQueue(t *testing.T) {
 		t.Errorf("Sentry tag %s not set", "gun")
 	}
 
-	if value != "registry.suse.com/bci/bci-busybox:latest" {
+	if value != gun {
 		t.Errorf("Sentry tag %s does not match. Want %s got %s", "gun", "registry.suse.com/bci/bci-busybox:latest", value)
 	}
 }
