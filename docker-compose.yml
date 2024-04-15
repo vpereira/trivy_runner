@@ -48,6 +48,20 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6380
 
+  getsizeworker:
+    build:
+      context: .
+      dockerfile: ./build/Dockerfile-getsizeworker
+    volumes:
+      - ./images:/app/images
+      - ./trivy-reports:/app/reports
+    networks:
+      - trivy-net
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6380
   pushworker:
     build:
       context: .
