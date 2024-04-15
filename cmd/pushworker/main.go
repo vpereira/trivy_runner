@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +26,11 @@ type ScanResult struct {
 	Image   string          `json:"image"`
 	RanAt   string          `json:"ran_at"`
 	Results json.RawMessage `json:"results"`
+}
+
+type UncompressedSize struct {
+	Image string `json:"image"`
+	Size  int    `json:"size"`
 }
 
 var (
@@ -98,6 +105,8 @@ func processQueue(webhookURL string) {
 
 	// Split the answer
 	// [topush registry.suse.com/bci/bci-busybox:latest|/app/reports/registry.suse.com_bci_bci-busybox_latest.json]
+	// or
+	// [topush registry.suse.com/bci/bci-busybox:latest|31337]
 	parts := strings.Split(redisAnswer[1], "|")
 
 	if len(parts) != 2 {
@@ -106,22 +115,30 @@ func processQueue(webhookURL string) {
 	}
 
 	imageName := parts[0]
-	reportPath := parts[1]
+	secondPart := parts[1]
 
-	scanResults, err := extractResults(reportPath)
+	if size, err := strconv.Atoi(secondPart); err == nil {
+		uncompressedSize := UncompressedSize{
+			Image: imageName,
+			Size:  size,
+		}
+		go sendToWebhook(webhookURL, uncompressedSize)
+	} else {
+		scanResults, err := extractResults(secondPart)
 
-	if err != nil {
-		errorHandler.Handle(err)
-		return
+		if err != nil {
+			errorHandler.Handle(err)
+			return
+		}
+
+		scanResult := ScanResult{
+			Image:   imageName,
+			RanAt:   time.Now().Format(time.RFC3339),
+			Results: scanResults,
+		}
+		go sendToWebhook(webhookURL, scanResult)
 	}
 
-	scanResult := ScanResult{
-		Image:   imageName,
-		RanAt:   time.Now().Format(time.RFC3339),
-		Results: scanResults,
-	}
-	// send it with a goroutine
-	go sendToWebhook(webhookURL, scanResult, imageName)
 }
 
 func extractResults(filePath string) (json.RawMessage, error) {
@@ -141,8 +158,9 @@ func extractResults(filePath string) (json.RawMessage, error) {
 	return result.Results, nil
 }
 
-func sendToWebhook(webhookURL string, result ScanResult, imageName string) {
+func sendToWebhook(webhookURL string, result interface{}) {
 	jsonData, err := json.Marshal(result)
+	imageName := reflect.TypeOf(result).Name()
 
 	if err != nil {
 		errorHandler.Handle(err)
