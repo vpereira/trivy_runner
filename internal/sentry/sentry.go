@@ -18,7 +18,7 @@ type Notifier interface {
 }
 
 // NewSentryNotifier initializes the Sentry client with the DSN from the environment variable.
-func NewSentryNotifier() *SentryNotifier {
+func NewSentryNotifier() Notifier {
 	dsn := os.Getenv("SENTRY_DSN")
 	if dsn == "" {
 		return &SentryNotifier{Enabled: false}

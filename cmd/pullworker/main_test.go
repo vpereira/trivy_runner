@@ -12,6 +12,17 @@ import (
 	"go.uber.org/zap"
 )
 
+type fakeNotifier struct {
+	Enabled bool
+	Tags    map[string]string
+}
+
+func (fn *fakeNotifier) NotifySentry(err error) {}
+
+func (fn *fakeNotifier) AddTag(name string, value string) {
+	fn.Tags[name] = value
+}
+
 func TestProcessQueue(t *testing.T) {
 	logger, _ = zap.NewProduction()
 	// Mock Redis server
@@ -46,6 +57,10 @@ func TestProcessQueue(t *testing.T) {
 	)
 
 	prometheusMetrics.Register()
+	mockNotifier := &fakeNotifier{
+		Tags: make(map[string]string),
+	}
+	sentryNotifier = mockNotifier
 
 	// Ensure to unregister metrics to avoid pollution across tests
 	defer prometheus.Unregister(prometheusMetrics.ProcessedOpsCounter)
@@ -53,6 +68,16 @@ func TestProcessQueue(t *testing.T) {
 	defer prometheus.Unregister(commandExecutionHistogram)
 
 	processQueue()
+
+	value, ok := mockNotifier.Tags["gun"]
+
+	if !ok {
+		t.Errorf("Sentry tag %s not set", "gun")
+	}
+
+	if value != "registry.suse.com/bci/bci-busybox:latest" {
+		t.Errorf("Sentry tag %s does not match. Want %s got %s", "gun", "registry.suse.com/bci/bci-busybox:latest", value)
+	}
 }
 
 func TestGenerateSkopeoCmdArgs(t *testing.T) {

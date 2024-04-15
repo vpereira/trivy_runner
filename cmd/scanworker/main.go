@@ -24,7 +24,7 @@ var (
 	ctx                       = context.Background()
 	rdb                       *redis.Client
 	airbrakeNotifier          *airbrake.AirbrakeNotifier
-	sentryNotifier            *sentry.SentryNotifier
+	sentryNotifier            sentry.Notifier
 	reportsAppDir             string
 	errorHandler              *error_handler.ErrorHandler
 	logger                    *zap.Logger
@@ -113,6 +113,8 @@ func processQueue() {
 	imageName := parts[0]
 	target := parts[1]
 
+	sentryNotifier.AddTag("gun", imageName)
+	sentryNotifier.AddTag("target-dir", targetDir)
 	// Delete the image when we're done
 	defer os.RemoveAll(target)
 
