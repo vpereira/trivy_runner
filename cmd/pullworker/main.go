@@ -117,7 +117,7 @@ func processQueue() {
 		return
 	}
 
-	sentryNotifier.AddTag("gun", imageName)
+	sentryNotifier.AddTag("image.name", imageName)
 	logger.Info("Processing image: ", zap.String("imageName", imageName))
 	logger.Info("Target directory: ", zap.String("targetDir", targetDir))
 	logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
