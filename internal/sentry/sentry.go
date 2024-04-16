@@ -46,7 +46,10 @@ func NewSentryNotifier() Notifier {
 }
 
 func (s *SentryNotifier) NotifySentry(err error) {
-	if s.Enabled && err != nil {
+	if !s.Enabled {
+		return
+	}
+	if err != nil {
 		log.Printf("Sending error to Sentry: %s", err)
 		sentry.CaptureException(err)
 		sentry.Flush(5 * time.Second)
@@ -54,7 +57,7 @@ func (s *SentryNotifier) NotifySentry(err error) {
 }
 
 func (s *SentryNotifier) AddTag(name string, value string) {
-	if s.Enabled {
+	if !s.Enabled {
 		return
 	}
 	sentry.ConfigureScope(func(scope *sentry.Scope) {
