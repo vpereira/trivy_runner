@@ -72,7 +72,7 @@ func TestProcessQueue(t *testing.T) {
 
 	processQueue()
 
-	value, ok := mockNotifier.Tags["gun"]
+	value, ok := mockNotifier.Tags["image.name"]
 
 	if !ok {
 		t.Errorf("Sentry tag %s not set", "gun")
