@@ -29,8 +29,8 @@ type ScanResult struct {
 }
 
 type UncompressedSize struct {
-	Image string `json:"image"`
-	Size  int    `json:"size"`
+	Image             string         `json:"image"`
+	UncompressedSizes map[string]int `json:"uncompressed_sizes"`
 }
 
 var (
@@ -103,6 +103,9 @@ func processQueue(webhookURL string) {
 		return
 	}
 
+	// TODO: Adapt it when adapting getsizeworker to support
+	// multiple architectures
+
 	// Split the answer
 	// [topush registry.suse.com/bci/bci-busybox:latest|/app/reports/registry.suse.com_bci_bci-busybox_latest.json]
 	// or
@@ -120,7 +123,11 @@ func processQueue(webhookURL string) {
 	if size, err := strconv.Atoi(secondPart); err == nil {
 		uncompressedSize := UncompressedSize{
 			Image: imageName,
-			Size:  size,
+			// TODO: Adapt it when adapting getsizeworker to support
+			// multiple architectures
+			UncompressedSizes: map[string]int{
+				"amd64": size,
+			},
 		}
 		go sendToWebhook(webhookURL, uncompressedSize)
 	} else {
