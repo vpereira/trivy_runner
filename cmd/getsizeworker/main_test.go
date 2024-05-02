@@ -84,7 +84,7 @@ func TestGenerateSkopeoCmdArgs(t *testing.T) {
 			envPassword: "testpass",
 			expectedResult: []string{
 				"copy", "--remove-signatures",
-				"--dest-username", "testuser", "--dest-password", "testpass",
+				"--src-username", "testuser", "--src-password", "testpass",
 				"docker://registry.example.com/myimage:latest",
 				"docker-archive:///tmp/targetdir",
 			},

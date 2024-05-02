@@ -180,7 +180,7 @@ func GenerateSkopeoCmdArgs(imageName, targetFilename string) []string {
 	registryPassword, passwordSet := os.LookupEnv("REGISTRY_PASSWORD")
 
 	if usernameSet && passwordSet {
-		cmdArgs = append(cmdArgs, "--dest-username", registryUsername, "--dest-password", registryPassword)
+		cmdArgs = append(cmdArgs, "--src-username", registryUsername, "--src-password", registryPassword)
 	}
 
 	// Add the rest of the command
