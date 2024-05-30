@@ -2,9 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,7 +19,6 @@ import (
 	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/internal/sentry"
-	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"go.uber.org/zap"
 )
 
@@ -33,6 +37,18 @@ var (
 		Buckets: prometheus.LinearBuckets(0, 5, 20),
 	}, []string{"skopeo"})
 )
+
+// ImageSize represents the size of the image for a specific architecture.
+type ImageSize struct {
+	Architecture string `json:"architecture"`
+	Size         int64  `json:"size"`
+}
+
+// Response represents the response to be returned to the user.
+type Response struct {
+	Image string           `json:"image"`
+	Sizes map[string]int64 `json:"sizes"`
+}
 
 func main() {
 	var err error
@@ -93,6 +109,31 @@ func main() {
 	}
 }
 
+func downloadImageAndGetSize(image, architecture, filePath string) (int64, error) {
+	cmdArgs := GenerateSkopeoCmdArgs(image, filePath, architecture)
+
+	fmt.Printf("Executing skopeo with arguments: %v\n", cmdArgs)
+	cmd := exec.Command("skopeo", cmdArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("skopeo output: %s, error: %s", string(output), err.Error())
+	}
+
+	fmt.Printf("skopeo output for architecture %s: %s\n", architecture, string(output))
+
+	// Ensure the file was created
+	if _, err := os.Stat(filePath); err != nil {
+		return 0, fmt.Errorf("error verifying file creation: %s", err.Error())
+	}
+
+	size, err := getFileSize(filePath)
+	if err != nil {
+		return 0, err
+	}
+
+	return size, nil
+}
+
 func processQueue() {
 	// Block until an image name is available in the 'topull' queue
 	result, err := rdb.BRPopLPush(ctx, "getsize", "processing_getsize", 0).Result()
@@ -102,53 +143,73 @@ func processQueue() {
 		return
 	}
 
-	targetDir, err := os.MkdirTemp(imagesAppDir, "trivy-scan-*")
-	tarballFilename := fmt.Sprintf("%s/image.tar", targetDir)
-
-	if err != nil {
-		errorHandler.Handle(err)
-		return
-	}
-
 	imageName := result
 
-	if imageName == "" {
+	imageNameSanitized := sanitizeImageName(imageName)
+
+	targetDir, err := os.MkdirTemp(imagesAppDir, "trivy-scan-*")
+
+	if err != nil {
 		errorHandler.Handle(err)
 		return
 	}
 
 	logger.Info("Processing image: ", zap.String("imageName", imageName))
 	logger.Info("Target directory: ", zap.String("targetDir", targetDir))
-	logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
 
-	cmdArgs := GenerateSkopeoCmdArgs(imageName, tarballFilename)
+	// Get the supported architectures for the image
+	architectures, err := getSupportedArchitectures(imageName)
 
-	startTime := time.Now()
-
-	cmd := exec_command.NewExecShellCommander("skopeo", cmdArgs...)
-
-	if _, err := cmd.Output(); err != nil {
+	if err != nil {
 		errorHandler.Handle(err)
 		return
 	}
 
-	executionTime := time.Since(startTime).Seconds()
+	defer os.RemoveAll(targetDir)
 
+	var wg sync.WaitGroup
+	sizeResults := make(chan ImageSize, len(architectures))
+
+	startTime := time.Now()
 	// Move the image name from 'processing_getsize' to 'topush'
 	_, err = rdb.LRem(ctx, "processing_getsize", 1, imageName).Result()
 	if err != nil {
 		errorHandler.Handle(err)
 		return
 	}
+	for _, arch := range architectures {
+		wg.Add(1)
+		go func(architecture string) {
+			defer wg.Done()
+			tarballFilename := filepath.Join(targetDir, fmt.Sprintf("%s_%s.tar", imageNameSanitized, architecture))
+			logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
+			size, err := downloadImageAndGetSize(imageName, architecture, tarballFilename)
+			if err != nil {
+				fmt.Printf("Error downloading image for architecture %s: %s\n", architecture, err.Error())
+				return
+			}
+			sizeResults <- ImageSize{Architecture: architecture, Size: size}
+		}(arch)
+	}
+	wg.Wait()
+	close(sizeResults)
+	executionTime := time.Since(startTime).Seconds()
 
-	imageSize, err := getFileSize(tarballFilename)
+	sizes := make(map[string]int64)
+	for result := range sizeResults {
+		sizes[result.Architecture] = result.Size
+	}
+
+	imageSizes := Response{Image: imageName, Sizes: sizes}
+
+	imageSizesJSON, err := json.Marshal(imageSizes)
 
 	if err != nil {
 		errorHandler.Handle(err)
 		return
 	}
 
-	toPushString := fmt.Sprintf("%s|%d", imageName, imageSize)
+	toPushString := fmt.Sprintf("%s|%d", imageName, imageSizesJSON)
 
 	logger.Info("Pushing image uncompressed size to topush queue:", zap.String("image", toPushString))
 
@@ -162,6 +223,44 @@ func processQueue() {
 	prometheusMetrics.IncOpsProcessed()
 }
 
+// GenerateSkopeoInspectCmdArgs generates the command line arguments for the skopeo inspect to fetch all supported architectures
+func GenerateSkopeoInspectCmdArgs(imageName string) []string {
+	return []string{"inspect", "--raw", fmt.Sprintf("docker://%s", imageName)}
+}
+
+// getSupportedArchitectures gets the list of supported architectures for a Docker image.
+func getSupportedArchitectures(image string) ([]string, error) {
+	cmdArgs := GenerateSkopeoInspectCmdArgs(image)
+	cmd := exec.Command("skopeo", cmdArgs...)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var manifest struct {
+		Manifests []struct {
+			Platform struct {
+				Architecture string `json:"architecture"`
+			} `json:"platform"`
+		} `json:"manifests"`
+	}
+	if err := json.Unmarshal(output, &manifest); err != nil {
+		return nil, err
+	}
+
+	var architectures []string
+	for _, m := range manifest.Manifests {
+		architectures = append(architectures, m.Platform.Architecture)
+	}
+
+	// Ensure at least "amd64" is included if no architectures were found
+	if len(architectures) == 0 {
+		architectures = []string{"amd64"}
+	}
+
+	return architectures, nil
+}
+
 // getFileSize returns the size of the file at the given path in bytes.
 func getFileSize(filePath string) (int64, error) {
 	fileInfo, err := os.Stat(filePath)
@@ -171,8 +270,7 @@ func getFileSize(filePath string) (int64, error) {
 	return fileInfo.Size(), nil
 }
 
-// GenerateSkopeoCmdArgs generates the command line arguments for the skopeo command based on environment variables and input parameters.
-func GenerateSkopeoCmdArgs(imageName, targetFilename string) []string {
+func GenerateSkopeoCmdArgs(imageName, targetFilename, architecture string) []string {
 	cmdArgs := []string{"copy", "--remove-signatures"}
 
 	// Check and add registry credentials if they are set
@@ -183,8 +281,18 @@ func GenerateSkopeoCmdArgs(imageName, targetFilename string) []string {
 		cmdArgs = append(cmdArgs, "--src-username", registryUsername, "--src-password", registryPassword)
 	}
 
-	// Add the rest of the command
+	// Add architecture override if specified
+	if architecture != "" {
+		cmdArgs = append(cmdArgs, "--override-arch", architecture)
+	}
+
+	// Add the rest of the command source image and destination tar
 	cmdArgs = append(cmdArgs, fmt.Sprintf("docker://%s", imageName), fmt.Sprintf("docker-archive://%s", targetFilename))
 
 	return cmdArgs
+}
+
+// sanitizeImageName replaces slashes and colons in the image name with underscores.
+func sanitizeImageName(image string) string {
+	return strings.NewReplacer("/", "_", ":", "_").Replace(image)
 }
