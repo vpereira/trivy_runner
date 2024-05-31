@@ -1,6 +1,6 @@
 module github.com/vpereira/trivy_runner
 
-go 1.21
+go 1.21.0
 
 require (
 	github.com/airbrake/gobrake/v5 v5.6.1
