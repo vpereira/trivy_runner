@@ -19,6 +19,7 @@ import (
 	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/internal/sentry"
+	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"go.uber.org/zap"
 )
 
@@ -112,14 +113,17 @@ func main() {
 func downloadImageAndGetSize(image, architecture, filePath string) (int64, error) {
 	cmdArgs := GenerateSkopeoCmdArgs(image, filePath, architecture)
 
-	fmt.Printf("Executing skopeo with arguments: %v\n", cmdArgs)
-	cmd := exec.Command("skopeo", cmdArgs...)
-	output, err := cmd.CombinedOutput()
+	logger.Info("Executing skopeo with arguments", zap.String("arguments", strings.Join(cmdArgs, " ")))
+
+	cmd := exec_command.NewExecShellCommander("skopeo", cmdArgs...)
+
+	output, err := cmd.Output()
+
 	if err != nil {
 		return 0, fmt.Errorf("skopeo output: %s, error: %s", string(output), err.Error())
 	}
 
-	fmt.Printf("skopeo output for architecture %s: %s\n", architecture, string(output))
+	logger.Info("skopeo output", zap.String("architecture", architecture), zap.String("output", string(output)))
 
 	// Ensure the file was created
 	if _, err := os.Stat(filePath); err != nil {
@@ -185,7 +189,8 @@ func processQueue() {
 			logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
 			size, err := downloadImageAndGetSize(imageName, architecture, tarballFilename)
 			if err != nil {
-				fmt.Printf("Error downloading image for architecture %s: %s\n", architecture, err.Error())
+				logger.Error("Error downloading image for architecture", zap.String("image", imageName), zap.String("architecture", architecture))
+				errorHandler.Handle(err)
 				return
 			}
 			sizeResults <- ImageSize{Architecture: architecture, Size: size}
