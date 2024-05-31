@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
@@ -31,6 +30,14 @@ type ScanResult struct {
 type UncompressedSize struct {
 	Image             string         `json:"image"`
 	UncompressedSizes map[string]int `json:"uncompressed_sizes"`
+}
+
+// TODO
+// We have it as well on getsizeworker/main.go
+// Response represents the response to be returned to the user.
+type Response struct {
+	Image string           `json:"image"`
+	Sizes map[string]int64 `json:"sizes"`
 }
 
 var (
@@ -120,17 +127,15 @@ func processQueue(webhookURL string) {
 	imageName := parts[0]
 	secondPart := parts[1]
 
-	if size, err := strconv.Atoi(secondPart); err == nil {
-		uncompressedSize := UncompressedSize{
-			Image: imageName,
-			// TODO: Adapt it when adapting getsizeworker to support
-			// multiple architectures
-			UncompressedSizes: map[string]int{
-				"amd64": size,
-			},
-		}
-		go sendToWebhook(webhookURL, uncompressedSize)
+	var uncompressedSizes Response
+
+	err = json.Unmarshal([]byte(secondPart), &uncompressedSizes)
+
+	if err == nil {
+		logger.Info("First part:", zap.String("imageName", imageName), zap.Any("uncompressedSizes", uncompressedSizes))
+		go sendToWebhook(webhookURL, uncompressedSizes)
 	} else {
+		logger.Info("Second part:", zap.String("imageName", imageName), zap.String("secondPart", secondPart))
 		scanResults, err := extractResults(secondPart)
 
 		if err != nil {
@@ -198,6 +203,6 @@ func sendToWebhook(webhookURL string, result interface{}) {
 		errorHandler.Handle(err)
 		return
 	}
-	logger.Info("Report sent successfully for image:", zap.String("imageName", imageName))
+	logger.Info("Report sent successfully for image:", zap.String("image", imageName))
 	prometheusMetrics.IncOpsProcessed()
 }

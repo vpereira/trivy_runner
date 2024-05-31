@@ -61,30 +61,35 @@ func TestGenerateSkopeoCmdArgs(t *testing.T) {
 	tests := []struct {
 		name           string
 		imageName      string
+		architecture   string
 		targetDir      string
 		envUsername    string
 		envPassword    string
 		expectedResult []string
 	}{
 		{
-			name:      "without credentials",
-			imageName: "registry.example.com/myimage:latest",
-			targetDir: "/tmp/targetdir",
+			name:         "without credentials",
+			imageName:    "registry.example.com/myimage:latest",
+			targetDir:    "/tmp/targetdir",
+			architecture: "amd64",
 			expectedResult: []string{
 				"copy", "--remove-signatures",
+				"--override-arch", "amd64",
 				"docker://registry.example.com/myimage:latest",
 				"docker-archive:///tmp/targetdir",
 			},
 		},
 		{
-			name:        "with credentials",
-			imageName:   "registry.example.com/myimage:latest",
-			targetDir:   "/tmp/targetdir",
-			envUsername: "testuser",
-			envPassword: "testpass",
+			name:         "with credentials",
+			imageName:    "registry.example.com/myimage:latest",
+			targetDir:    "/tmp/targetdir",
+			envUsername:  "testuser",
+			envPassword:  "testpass",
+			architecture: "amd64",
 			expectedResult: []string{
 				"copy", "--remove-signatures",
 				"--src-username", "testuser", "--src-password", "testpass",
+				"--override-arch", "amd64",
 				"docker://registry.example.com/myimage:latest",
 				"docker-archive:///tmp/targetdir",
 			},
@@ -102,7 +107,7 @@ func TestGenerateSkopeoCmdArgs(t *testing.T) {
 			}
 
 			// Call the method under test
-			result := GenerateSkopeoCmdArgs(tc.imageName, tc.targetDir)
+			result := GenerateSkopeoCmdArgs(tc.imageName, tc.targetDir, tc.architecture)
 
 			// Verify the result
 			if !reflect.DeepEqual(result, tc.expectedResult) {

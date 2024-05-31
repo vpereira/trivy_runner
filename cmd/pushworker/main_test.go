@@ -93,7 +93,7 @@ func TestProcessQueueForImageSize(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &result)
 
-		if result.Image != "registry.suse.com/bci/bci-busybox:latest" {
+		if result.Image != "registry.suse.com/bci/dotnet-sdk:7.0" {
 			t.Errorf("Unexpected image name: %s", result.Image)
 		}
 
@@ -111,7 +111,7 @@ func TestProcessQueueForImageSize(t *testing.T) {
 	rdb = redis.NewClient(&redis.Options{
 		Addr: mr.Addr(),
 	})
-	_, err = rdb.RPush(ctx, "topush", "registry.suse.com/bci/bci-busybox:latest|31337").Result()
+	_, err = rdb.RPush(ctx, "topush", "registry.suse.com/bci/dotnet-sdk:7.0|{\"image\":\"registry.suse.com/bci/dotnet-sdk:7.0\",\"sizes\":{\"amd64\":760144384}}").Result()
 	if err != nil {
 		t.Fatal(err)
 	}
