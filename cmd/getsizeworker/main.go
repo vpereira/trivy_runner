@@ -214,7 +214,7 @@ func processQueue() {
 		return
 	}
 
-	toPushString := fmt.Sprintf("%s|%d", imageName, imageSizesJSON)
+	toPushString := fmt.Sprintf("%s|%s", imageName, string(imageSizesJSON))
 
 	logger.Info("Pushing image uncompressed size to topush queue:", zap.String("image", toPushString))
 
