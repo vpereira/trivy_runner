@@ -50,16 +50,13 @@ var (
 	prometheusMetrics *metrics.Metrics
 )
 
-func main() {
+func init() {
 	var err error
 	logger, err = zap.NewProduction()
 
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
 	}
-
-	defer logger.Sync()
-
 	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
 
 	if airbrakeNotifier == nil {
@@ -82,6 +79,11 @@ func main() {
 			Help: "Total number of processed errors by the pushworker.",
 		},
 	)
+}
+
+func main() {
+
+	defer logger.Sync()
 
 	prometheusMetrics.Register()
 
