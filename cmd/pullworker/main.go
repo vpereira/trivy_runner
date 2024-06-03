@@ -129,8 +129,8 @@ func processQueue() {
 
 	cmd := exec_command.NewExecShellCommander("skopeo", cmdArgs...)
 
-	if _, err := cmd.Output(); err != nil {
-		errorHandler.Handle(err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		errorHandler.Handle(fmt.Errorf("skopeo output: %s, error: %s", string(output), err.Error()))
 		return
 	}
 
