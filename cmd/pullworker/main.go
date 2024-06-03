@@ -34,7 +34,7 @@ var (
 	}, []string{"skopeo"})
 )
 
-func main() {
+func init() {
 	var err error
 
 	logger, err = zap.NewProduction()
@@ -42,8 +42,6 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
 	}
-
-	defer func() { _ = logger.Sync() }()
 
 	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
 
@@ -68,6 +66,11 @@ func main() {
 		},
 		commandExecutionHistogram,
 	)
+	imagesAppDir = redisutil.GetEnv("IMAGES_APP_DIR", "/app/images")
+}
+
+func main() {
+	defer func() { _ = logger.Sync() }()
 
 	prometheusMetrics.Register()
 
@@ -75,9 +78,7 @@ func main() {
 
 	rdb = redisutil.InitializeClient()
 
-	imagesAppDir = redisutil.GetEnv("IMAGES_APP_DIR", "/app/images")
-
-	err = os.MkdirAll(imagesAppDir, os.ModePerm)
+	err := os.MkdirAll(imagesAppDir, os.ModePerm)
 
 	if err != nil {
 		logger.Error("Failed to create base directory:", zap.Error(err))

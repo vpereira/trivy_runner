@@ -9,6 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/metrics"
+	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"go.uber.org/zap"
 )
 
@@ -23,6 +24,7 @@ func TestProcessQueue(t *testing.T) {
 
 	os.Setenv("REDIS_HOST", mr.Host())
 	os.Setenv("REDIS_PORT", mr.Port())
+	os.Setenv("IMAGES_APP_DIR", "/tmp")
 
 	// Initialize Redis client and push a mock entry
 	rdb = redis.NewClient(&redis.Options{
@@ -33,6 +35,7 @@ func TestProcessQueue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	imagesAppDir = redisutil.GetEnv("IMAGES_APP_DIR", "/app/images")
 
 	prometheusMetrics = metrics.NewMetrics(
 		prometheus.CounterOpts{

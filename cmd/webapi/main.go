@@ -27,23 +27,17 @@ var (
 	prometheusMetrics *metrics.Metrics
 )
 
-func main() {
+func init() {
 	var err error
 	logger, err = zap.NewProduction()
-
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
 	}
 
-	defer logger.Sync()
-
 	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
-
 	if airbrakeNotifier == nil {
 		logger.Error("Failed to create airbrake notifier")
 	}
-
-	rdb = redisutil.InitializeClient()
 
 	prometheusMetrics = metrics.NewMetrics(
 		prometheus.CounterOpts{
@@ -56,13 +50,18 @@ func main() {
 		},
 	)
 	prometheusMetrics.Register()
-	// Setup HTTP server
+}
+
+func main() {
+	defer logger.Sync()
+	rdb = redisutil.InitializeClient()
+	logger.Info("Server started on :8080")
+	// Setup HTTP server routes
 	http.Handle("/health", logging.LoggingMiddleware(http.HandlerFunc(handleHealth)))
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/scan", logging.LoggingMiddleware(http.HandlerFunc(handleScan)))
 	http.Handle("/get-uncompressed-size", logging.LoggingMiddleware(http.HandlerFunc(handleGetUncompressedSize)))
 	http.Handle("/report", logging.LoggingMiddleware(http.HandlerFunc(handleReport)))
-	logger.Info("Server started on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
