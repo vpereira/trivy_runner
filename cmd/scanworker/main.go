@@ -36,15 +36,13 @@ var (
 	}, []string{"trivy"})
 )
 
-func main() {
+func init() {
 	var err error
 	logger, err = zap.NewProduction()
 
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
 	}
-
-	defer logger.Sync()
 
 	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
 
@@ -70,15 +68,19 @@ func main() {
 		commandExecutionHistogram,
 	)
 
+	reportsAppDir = redisutil.GetEnv("REPORTS_APP_DIR", "/app/reports")
+
 	prometheusMetrics.Register()
+}
+
+func main() {
+	defer logger.Sync()
 
 	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, airbrakeNotifier, sentryNotifier)
 
 	rdb = redisutil.InitializeClient()
 
-	reportsAppDir = redisutil.GetEnv("REPORTS_APP_DIR", "/app/reports")
-
-	err = os.MkdirAll(reportsAppDir, os.ModePerm)
+	err := os.MkdirAll(reportsAppDir, os.ModePerm)
 
 	if err != nil {
 		logger.Error("Failed to create base directory:", zap.String("dir", reportsAppDir), zap.Error(err))
