@@ -3,11 +3,10 @@ package redisutil
 import (
 	"context"
 	"log"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/vpereira/trivy_runner/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -19,8 +18,8 @@ func InitializeClient() *redis.Client {
 		log.Fatal("Failed to create logger:", err)
 	}
 
-	redisHost := GetEnv("REDIS_HOST", "localhost")
-	redisPort := GetEnv("REDIS_PORT", "6379")
+	redisHost := util.GetEnv("REDIS_HOST", "localhost")
+	redisPort := util.GetEnv("REDIS_PORT", "6379")
 	redisURL := redisHost + ":" + redisPort
 
 	redisClient := redis.NewClient(&redis.Options{
@@ -30,8 +29,8 @@ func InitializeClient() *redis.Client {
 	})
 
 	// Retry configuration
-	maxRetries := GetEnvAsInt("REDIS_MAX_TRIES", 5)
-	retryInterval := time.Duration(GetEnvAsInt("REDIS_CONNECTION_INTERVAL_RETRY", 2)) * time.Second
+	maxRetries := util.GetEnvAsInt("REDIS_MAX_TRIES", 5)
+	retryInterval := time.Duration(util.GetEnvAsInt("REDIS_CONNECTION_INTERVAL_RETRY", 2)) * time.Second
 
 	for i := 0; i < maxRetries; i++ {
 		_, err := redisClient.Ping(context.Background()).Result()
@@ -48,23 +47,4 @@ func InitializeClient() *redis.Client {
 
 	log.Fatalf("Failed to connect to Redis after %d attempts", maxRetries)
 	return nil
-}
-
-// GetEnv retrieves an environment variable or returns a default value.
-// TODO move this to a common package
-func GetEnv(key, fallback string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
-	}
-	return fallback
-}
-
-// GetEnvAsInt gets an environment variable as an integer, with a fallback default value.
-// TODO move this to a common package
-func GetEnvAsInt(key string, fallback int) int {
-	valueStr := os.Getenv(key)
-	if value, err := strconv.Atoi(valueStr); err == nil {
-		return value
-	}
-	return fallback
 }

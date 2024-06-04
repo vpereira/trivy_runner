@@ -14,6 +14,7 @@ import (
 	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/internal/sentry"
+	"github.com/vpereira/trivy_runner/internal/util"
 	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"go.uber.org/zap"
 )
@@ -66,7 +67,7 @@ func init() {
 		},
 		commandExecutionHistogram,
 	)
-	imagesAppDir = redisutil.GetEnv("IMAGES_APP_DIR", "/app/images")
+	imagesAppDir = util.GetEnv("IMAGES_APP_DIR", "/app/images")
 }
 
 func main() {

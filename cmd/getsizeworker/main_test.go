@@ -9,7 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/metrics"
-	"github.com/vpereira/trivy_runner/internal/redisutil"
+	"github.com/vpereira/trivy_runner/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -35,7 +35,7 @@ func TestProcessQueue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	imagesAppDir = redisutil.GetEnv("IMAGES_APP_DIR", "/app/images")
+	imagesAppDir = util.GetEnv("IMAGES_APP_DIR", "/app/images")
 
 	prometheusMetrics = metrics.NewMetrics(
 		prometheus.CounterOpts{
