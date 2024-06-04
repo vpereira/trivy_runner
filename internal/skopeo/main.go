@@ -35,7 +35,7 @@ func GenerateSkopeoCmdArgs(imageName, targetFilename, architecture string) []str
 	return cmdArgs
 }
 
-// getSupportedArchitectures gets the list of supported architectures for a Docker image.
+// GetSupportedArchitectures gets the list of supported architectures for a Docker image.
 func GetSupportedArchitectures(image string) ([]string, error) {
 	cmdArgs := GenerateSkopeoInspectCmdArgs(image)
 	cmd := exec_command.NewExecShellCommander("skopeo", cmdArgs...)
@@ -45,25 +45,29 @@ func GetSupportedArchitectures(image string) ([]string, error) {
 	}
 
 	var manifest struct {
+		MediaType string `json:"mediaType"`
 		Manifests []struct {
 			Platform struct {
 				Architecture string `json:"architecture"`
 			} `json:"platform"`
 		} `json:"manifests"`
 	}
+
 	if err := json.Unmarshal(output, &manifest); err != nil {
 		return nil, err
 	}
 
-	var architectures []string
-	for _, m := range manifest.Manifests {
-		architectures = append(architectures, m.Platform.Architecture)
+	// Check the media type
+	if manifest.MediaType == "application/vnd.docker.distribution.manifest.list.v2+json" {
+		var architectures []string
+		for _, m := range manifest.Manifests {
+			architectures = append(architectures, m.Platform.Architecture)
+		}
+		return architectures, nil
+	} else if manifest.MediaType == "application/vnd.docker.distribution.manifest.v2+json" {
+		return []string{"amd64"}, nil
 	}
 
-	// Ensure at least "amd64" is included if no architectures were found
-	if len(architectures) == 0 {
-		architectures = []string{"amd64"}
-	}
-
-	return architectures, nil
+	// Default case, if media type doesn't match known values
+	return nil, fmt.Errorf("unsupported media type: %s", manifest.MediaType)
 }
