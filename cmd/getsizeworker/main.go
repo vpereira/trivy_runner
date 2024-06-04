@@ -118,7 +118,7 @@ func downloadImageAndGetSize(image, architecture, filePath string) (int64, error
 
 	cmd := exec_command.NewExecShellCommander("skopeo", cmdArgs...)
 
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 
 	if err != nil {
 		return 0, fmt.Errorf("skopeo output: %s, error: %s", string(output), err.Error())
@@ -190,7 +190,6 @@ func processQueue() {
 			logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
 			size, err := downloadImageAndGetSize(imageName, architecture, tarballFilename)
 			if err != nil {
-				logger.Error("Error downloading image for architecture", zap.String("image", imageName), zap.String("architecture", architecture))
 				errorHandler.Handle(err)
 				return
 			}
@@ -238,9 +237,9 @@ func GenerateSkopeoInspectCmdArgs(imageName string) []string {
 func getSupportedArchitectures(image string) ([]string, error) {
 	cmdArgs := GenerateSkopeoInspectCmdArgs(image)
 	cmd := exec.Command("skopeo", cmdArgs...)
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("skopeo output: %s, error: %s", string(output), err.Error())
 	}
 
 	var manifest struct {

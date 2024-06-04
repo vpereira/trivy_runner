@@ -132,11 +132,11 @@ func processQueue() {
 	startTime := time.Now()
 	cmd := exec_command.NewExecShellCommander("trivy", cmdArgs...)
 
-	if _, err := cmd.Output(); err != nil {
+	if output, err := cmd.CombinedOutput(); err != nil {
 		if sentryNotifier != nil {
 			sentryNotifier.AddTag("gun", imageName)
 		}
-		errorHandler.Handle(err)
+		errorHandler.Handle(fmt.Errorf("trivy output: %s, error: %s", string(output), err.Error()))
 		return
 	}
 

@@ -6,7 +6,7 @@ import (
 
 type IShellCommand interface {
 	SetDir(string)
-	Output() ([]byte, error)
+	CombinedOutput() ([]byte, error)
 	Wait() error
 }
 
@@ -16,6 +16,10 @@ type execShellCommand struct {
 
 func (exc execShellCommand) SetDir(dir string) {
 	exc.Dir = dir
+}
+
+func (exc execShellCommand) CombinedOutput() ([]byte, error) {
+	return exc.Cmd.CombinedOutput()
 }
 
 func NewExecShellCommander(name string, arg ...string) IShellCommand {
