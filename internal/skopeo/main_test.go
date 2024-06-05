@@ -7,12 +7,43 @@ import (
 )
 
 func TestGenerateSkopeoInspectCmdArgs(t *testing.T) {
-	imageName := "example/image:latest"
-	expected := []string{"inspect", "--raw", "docker://example/image:latest"}
+	tests := []struct {
+		imageName   string
+		envUsername string
+		envPassword string
+		expected    []string
+	}{
+		{
+			"example/image:latest",
+			"",
+			"",
+			[]string{"inspect", "--raw", "docker://example/image:latest"},
+		},
+		{
+			"example/image:latest",
+			"user",
+			"pass",
+			[]string{"inspect", "--raw", "--username", "user", "--password", "pass", "docker://example/image:latest"},
+		},
+	}
 
-	result := GenerateSkopeoInspectCmdArgs(imageName)
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("GenerateSkopeoInspectCmdArgs(%s) = %v; expected %v", imageName, result, expected)
+	for _, tt := range tests {
+		if tt.envUsername != "" {
+			os.Setenv("REGISTRY_USERNAME", tt.envUsername)
+		} else {
+			os.Unsetenv("REGISTRY_USERNAME")
+		}
+
+		if tt.envPassword != "" {
+			os.Setenv("REGISTRY_PASSWORD", tt.envPassword)
+		} else {
+			os.Unsetenv("REGISTRY_PASSWORD")
+		}
+
+		result := GenerateSkopeoInspectCmdArgs(tt.imageName)
+		if !reflect.DeepEqual(result, tt.expected) {
+			t.Errorf("GenerateSkopeoInspectCmdArgs(%s) = %v; expected %v", tt.imageName, result, tt.expected)
+		}
 	}
 }
 
