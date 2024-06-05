@@ -10,7 +10,19 @@ import (
 
 // GenerateSkopeoInspectCmdArgs generates the command line arguments for the skopeo inspect to fetch all supported architectures
 func GenerateSkopeoInspectCmdArgs(imageName string) []string {
-	return []string{"inspect", "--raw", fmt.Sprintf("docker://%s", imageName)}
+	cmdArgs := []string{"inspect", "--raw"}
+
+	// Check and add registry credentials if they are set
+	registryUsername, usernameSet := os.LookupEnv("REGISTRY_USERNAME")
+	registryPassword, passwordSet := os.LookupEnv("REGISTRY_PASSWORD")
+
+	if usernameSet && passwordSet {
+		cmdArgs = append(cmdArgs, "--username", registryUsername, "--password", registryPassword)
+	}
+
+	cmdArgs = append(cmdArgs, fmt.Sprintf("docker://%s", imageName))
+
+	return cmdArgs
 }
 
 func GenerateSkopeoCmdArgs(imageName, targetFilename, architecture string) []string {
