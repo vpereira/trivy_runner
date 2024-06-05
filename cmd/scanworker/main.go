@@ -16,6 +16,7 @@ import (
 	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/internal/sentry"
+	"github.com/vpereira/trivy_runner/internal/util"
 	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"go.uber.org/zap"
 )
@@ -68,7 +69,7 @@ func init() {
 		commandExecutionHistogram,
 	)
 
-	reportsAppDir = redisutil.GetEnv("REPORTS_APP_DIR", "/app/reports")
+	reportsAppDir = util.GetEnv("REPORTS_APP_DIR", "/app/reports")
 
 	prometheusMetrics.Register()
 }
@@ -164,7 +165,7 @@ func generateTrivyCmdArgs(resultFileName, target string) []string {
 	cmdArgs := []string{"image"}
 
 	// Check if SLOW_RUN environment variable is set to "1" and add "--slow" parameter
-	slowRun := redisutil.GetEnv("SLOW_RUN", "0")
+	slowRun := util.GetEnv("SLOW_RUN", "0")
 	if slowRun == "1" {
 		cmdArgs = append(cmdArgs, "--slow")
 	}

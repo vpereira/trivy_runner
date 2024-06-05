@@ -14,6 +14,8 @@ import (
 	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/internal/sentry"
+	"github.com/vpereira/trivy_runner/internal/skopeo"
+	"github.com/vpereira/trivy_runner/internal/util"
 	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"go.uber.org/zap"
 )
@@ -66,7 +68,7 @@ func init() {
 		},
 		commandExecutionHistogram,
 	)
-	imagesAppDir = redisutil.GetEnv("IMAGES_APP_DIR", "/app/images")
+	imagesAppDir = util.GetEnv("IMAGES_APP_DIR", "/app/images")
 }
 
 func main() {
@@ -118,12 +120,27 @@ func processQueue() {
 		return
 	}
 
+	toPullArch := "amd64"
+	// TODO
+	// if we want to make trivy multi arch, we need to pull all the archs
+	supportedArchitectures, err := skopeo.GetSupportedArchitectures(imageName)
+
+	if err != nil {
+		errorHandler.Handle(err)
+		return
+	}
+
+	if !util.Contains(supportedArchitectures, "amd64") {
+		toPullArch = supportedArchitectures[0]
+	}
+
 	sentryNotifier.AddTag("image.name", imageName)
 	logger.Info("Processing image: ", zap.String("imageName", imageName))
+	logger.Info("Architecture to pull: ", zap.String("architecture", toPullArch))
 	logger.Info("Target directory: ", zap.String("targetDir", targetDir))
 	logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
 
-	cmdArgs := GenerateSkopeoCmdArgs(imageName, tarballFilename)
+	cmdArgs := skopeo.GenerateSkopeoCmdArgs(imageName, tarballFilename, toPullArch)
 
 	startTime := time.Now()
 
@@ -155,22 +172,4 @@ func processQueue() {
 	}
 	prometheusMetrics.CommandExecutionDurationHistogram.WithLabelValues(imageName).Observe(executionTime)
 	prometheusMetrics.IncOpsProcessed()
-}
-
-// GenerateSkopeoCmdArgs generates the command line arguments for the skopeo command based on environment variables and input parameters.
-func GenerateSkopeoCmdArgs(imageName, targetFilename string) []string {
-	cmdArgs := []string{"copy", "--remove-signatures"}
-
-	// Check and add registry credentials if they are set
-	registryUsername, usernameSet := os.LookupEnv("REGISTRY_USERNAME")
-	registryPassword, passwordSet := os.LookupEnv("REGISTRY_PASSWORD")
-
-	if usernameSet && passwordSet {
-		cmdArgs = append(cmdArgs, "--src-username", registryUsername, "--src-password", registryPassword)
-	}
-
-	// Add the rest of the command
-	cmdArgs = append(cmdArgs, fmt.Sprintf("docker://%s", imageName), fmt.Sprintf("docker-archive://%s", targetFilename))
-
-	return cmdArgs
 }
