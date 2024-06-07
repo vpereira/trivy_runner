@@ -7,7 +7,7 @@ import (
 // DTO's to be used internally through the redis queue
 
 type GetSizeResult struct {
-	Sizes map[string]int64 `json:"sizes"`
+	Sizes map[string]int64 `json:"uncompressed_sizes"`
 }
 
 type ScanResult struct {
