@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,29 +15,11 @@ import (
 	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/error_handler"
 	"github.com/vpereira/trivy_runner/internal/metrics"
+	"github.com/vpereira/trivy_runner/internal/pushworker"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/internal/sentry"
 	"go.uber.org/zap"
 )
-
-type ScanResult struct {
-	Image   string          `json:"image"`
-	RanAt   string          `json:"ran_at"`
-	Results json.RawMessage `json:"results"`
-}
-
-type UncompressedSize struct {
-	Image             string         `json:"image"`
-	UncompressedSizes map[string]int `json:"uncompressed_sizes"`
-}
-
-// TODO
-// We have it as well on getsizeworker/main.go
-// Response represents the response to be returned to the user.
-type Response struct {
-	Image string           `json:"image"`
-	Sizes map[string]int64 `json:"sizes"`
-}
 
 var (
 	ctx               = context.Background()
@@ -105,54 +86,42 @@ func main() {
 }
 
 func processQueue(webhookURL string) {
-	redisAnswer, err := rdb.BRPop(ctx, 0, "topush").Result()
+	answer, err := rdb.BRPop(ctx, 0, "topush").Result()
 
 	if err != nil {
 		errorHandler.Handle(err)
 		return
 	}
 
-	// TODO: Adapt it when adapting getsizeworker to support
-	// multiple architectures
+	item := answer[1]
 
-	// Split the answer
-	// [topush registry.suse.com/bci/bci-busybox:latest|/app/reports/registry.suse.com_bci_bci-busybox_latest.json]
-	// or
-	// [topush registry.suse.com/bci/bci-busybox:latest|31337]
-	parts := strings.Split(redisAnswer[1], "|")
+	var dto pushworker.DTO
+	err = json.Unmarshal([]byte(item), &dto)
 
-	if len(parts) != 2 {
+	if err != nil {
+		logger.Info("Could not Unmarshal dto", zap.String("item", item), zap.Error(err))
 		errorHandler.Handle(err)
 		return
 	}
 
-	imageName := parts[0]
-	secondPart := parts[1]
+	payload := pushworker.NewPayload()
+	payload.Operation = dto.Operation
+	payload.Image = dto.Image
+	payload.Sizes = dto.Sizes
 
-	var uncompressedSizes Response
-
-	err = json.Unmarshal([]byte(secondPart), &uncompressedSizes)
-
-	if err == nil {
-		logger.Info("First part:", zap.String("imageName", imageName), zap.Any("uncompressedSizes", uncompressedSizes))
-		go sendToWebhook(webhookURL, uncompressedSizes)
-	} else {
-		logger.Info("Second part:", zap.String("imageName", imageName), zap.String("secondPart", secondPart))
-		scanResults, err := extractResults(secondPart)
-
+	if dto.ResultFilePath != "" {
+		scanResults, err := extractResults(dto.ResultFilePath)
 		if err != nil {
+			logger.Info("Could not extract scan results", zap.String("item", item), zap.Error(err))
 			errorHandler.Handle(err)
 			return
 		}
 
-		scanResult := ScanResult{
-			Image:   imageName,
-			RanAt:   time.Now().Format(time.RFC3339),
-			Results: scanResults,
-		}
-		go sendToWebhook(webhookURL, scanResult)
+		payload.Results = scanResults
+		payload.RanAt = time.Now().Format(time.RFC3339)
 	}
 
+	go sendToWebhook(webhookURL, payload)
 }
 
 func extractResults(filePath string) (json.RawMessage, error) {
@@ -163,7 +132,7 @@ func extractResults(filePath string) (json.RawMessage, error) {
 	}
 
 	// unmarshal the data
-	var result ScanResult
+	var result pushworker.ScanPayload
 	err = json.Unmarshal(data, &result)
 	if err != nil {
 		return nil, err
