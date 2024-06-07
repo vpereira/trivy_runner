@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/error_handler"
 	"github.com/vpereira/trivy_runner/internal/metrics"
+	"github.com/vpereira/trivy_runner/internal/pushworker"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/internal/sentry"
 	"github.com/vpereira/trivy_runner/internal/skopeo"
@@ -44,12 +44,6 @@ var (
 type ImageSize struct {
 	Architecture string `json:"architecture"`
 	Size         int64  `json:"size"`
-}
-
-// Response represents the response to be returned to the user.
-type Response struct {
-	Image string           `json:"image"`
-	Sizes map[string]int64 `json:"sizes"`
 }
 
 func init() {
@@ -206,18 +200,20 @@ func processQueue() {
 		sizes[result.Architecture] = result.Size
 	}
 
-	imageSizes := Response{Image: imageName, Sizes: sizes}
+	payload := pushworker.NewGetSizeDTO()
+	payload.Sizes = sizes
+	payload.Image = imageName
 
-	imageSizesJSON, err := json.Marshal(imageSizes)
+	jsonData, err := payload.ToJSON()
 
 	if err != nil {
 		errorHandler.Handle(err)
 		return
 	}
 
-	toPushString := fmt.Sprintf("%s|%s", imageName, string(imageSizesJSON))
+	toPushString := string(jsonData)
 
-	logger.Info("Pushing image uncompressed size to topush queue:", zap.String("image", toPushString))
+	logger.Info("Pushing image uncompressed size to topush queue:", zap.String("payload", toPushString))
 
 	err = rdb.LPush(ctx, "topush", toPushString).Err()
 

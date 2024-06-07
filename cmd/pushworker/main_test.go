@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/metrics"
+	"github.com/vpereira/trivy_runner/internal/pushworker"
 	"go.uber.org/zap"
 )
 
@@ -27,12 +28,25 @@ func TestProcessQueue(t *testing.T) {
 
 	// Mock webhook server
 	webhookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var result ScanResult
+		result := pushworker.NewPayload()
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &result)
 
 		if result.Image != "registry.suse.com/bci/bci-busybox:latest" {
 			t.Errorf("Unexpected image name: %s", result.Image)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if result.Operation != "scan" {
+			t.Errorf("Unexpected image name: %s", result.Image)
+			w.WriteHeader(http.StatusBadRequest)
+		}
+
+		if result.Results == nil {
+			t.Errorf("Unexpected empty results: %+v", result.Results)
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -49,7 +63,16 @@ func TestProcessQueue(t *testing.T) {
 	rdb = redis.NewClient(&redis.Options{
 		Addr: mr.Addr(),
 	})
-	_, err = rdb.RPush(ctx, "topush", "registry.suse.com/bci/bci-busybox:latest|./test_reports/registry.suse.com_bci_bci-busybox_latest.json").Result()
+
+	var dto pushworker.DTO = pushworker.NewScanDTO()
+	dto.Image = "registry.suse.com/bci/bci-busybox:latest"
+	dto.ResultFilePath = "./test_reports/registry.suse.com_bci_bci-busybox_latest.json"
+	content, err := dto.ToJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = rdb.RPush(ctx, "topush", string(content)).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,12 +112,27 @@ func TestProcessQueueForImageSize(t *testing.T) {
 
 	// Mock webhook server
 	webhookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var result UncompressedSize
+		result := pushworker.NewPayload()
 		body, _ := io.ReadAll(r.Body)
+
 		_ = json.Unmarshal(body, &result)
+
+		if result.Operation != "get-uncompressed-size" {
+			t.Errorf("Unexpected image name: %s", result.Image)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		if result.Image != "registry.suse.com/bci/dotnet-sdk:7.0" {
 			t.Errorf("Unexpected image name: %s", result.Image)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if gotSize := result.Sizes["amd64"]; gotSize != 760144384 {
+			t.Errorf("Unexpected image size: %+v", gotSize)
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -111,7 +149,17 @@ func TestProcessQueueForImageSize(t *testing.T) {
 	rdb = redis.NewClient(&redis.Options{
 		Addr: mr.Addr(),
 	})
-	_, err = rdb.RPush(ctx, "topush", "registry.suse.com/bci/dotnet-sdk:7.0|{\"image\":\"registry.suse.com/bci/dotnet-sdk:7.0\",\"sizes\":{\"amd64\":760144384}}").Result()
+
+	var dto pushworker.DTO = pushworker.NewGetSizeDTO()
+	dto.Image = "registry.suse.com/bci/dotnet-sdk:7.0"
+	dto.Sizes["amd64"] = 760144384
+
+	content, err := dto.ToJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = rdb.RPush(ctx, "topush", string(content)).Result()
 	if err != nil {
 		t.Fatal(err)
 	}

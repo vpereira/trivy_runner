@@ -14,6 +14,7 @@ import (
 	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/error_handler"
 	"github.com/vpereira/trivy_runner/internal/metrics"
+	"github.com/vpereira/trivy_runner/internal/pushworker"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/internal/sentry"
 	"github.com/vpereira/trivy_runner/internal/util"
@@ -145,7 +146,20 @@ func processQueue() {
 	logger.Info("Scan complete for image:", zap.String("image", imageName), zap.String("json_report", resultFileName))
 
 	if os.Getenv("PUSH_TO_CATALOG") != "" {
-		err = rdb.LPush(ctx, "topush", fmt.Sprintf("%s|%s", imageName, resultFileName)).Err()
+		payload := pushworker.NewScanDTO()
+		payload.ResultFilePath = resultFileName
+		payload.Image = imageName
+
+		jsonData, err := payload.ToJSON()
+		if err != nil {
+			errorHandler.Handle(err)
+			return
+		}
+
+		toPushString := string(jsonData)
+		logger.Info("Pushing image scan to topush queue:", zap.String("payload", toPushString))
+
+		err = rdb.LPush(ctx, "topush", jsonData).Err()
 		if err != nil {
 			errorHandler.Handle(err)
 			return
