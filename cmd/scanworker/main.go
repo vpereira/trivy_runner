@@ -17,6 +17,7 @@ import (
 	"github.com/vpereira/trivy_runner/internal/pushworker"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/internal/sentry"
+	"github.com/vpereira/trivy_runner/internal/trivy"
 	"github.com/vpereira/trivy_runner/internal/util"
 	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"go.uber.org/zap"
@@ -129,7 +130,7 @@ func processQueue() {
 	logger.Info("Scanning image:", zap.String("image", imageName))
 	logger.Info("Saving results to:", zap.String("json_report", resultFileName))
 
-	cmdArgs := generateTrivyCmdArgs(resultFileName, target)
+	cmdArgs := trivy.GenerateTrivyScanCmdArgs(resultFileName, target)
 
 	startTime := time.Now()
 	cmd := exec_command.NewExecShellCommander("trivy", cmdArgs...)
@@ -173,18 +174,4 @@ func calculateResultName(imageName string) string {
 	safeImageName := strings.ReplaceAll(imageName, "/", "_")
 	safeImageName = strings.ReplaceAll(safeImageName, ":", "_")
 	return filepath.Join(reportsAppDir, safeImageName+".json")
-}
-
-func generateTrivyCmdArgs(resultFileName, target string) []string {
-	cmdArgs := []string{"image"}
-
-	// Check if SLOW_RUN environment variable is set to "1" and add "--slow" parameter
-	slowRun := util.GetEnv("SLOW_RUN", "0")
-	if slowRun == "1" {
-		cmdArgs = append(cmdArgs, "--slow")
-	}
-
-	cmdArgs = append(cmdArgs, "--format", "json", "--output", resultFileName, "--input", target)
-
-	return cmdArgs
 }
