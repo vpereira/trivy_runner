@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/vpereira/trivy_runner/internal/util"
 )
 
 func TestCalculateResultName(t *testing.T) {
@@ -68,22 +70,9 @@ func TestGenerateTrivyCmdArgs(t *testing.T) {
 			defer tt.cleanupEnv()
 
 			gotArgs := generateTrivyCmdArgs(tt.resultFileName, tt.targetDir)
-			if !equalSlice(gotArgs, tt.wantArgs) {
+			if !util.EqualSlice(gotArgs, tt.wantArgs) {
 				t.Errorf("generateTrivyCmdArgs() got %v, want %v", gotArgs, tt.wantArgs)
 			}
 		})
 	}
-}
-
-// Helper function to compare slices as reflect.DeepEqual can be overkill for simple string slices
-func equalSlice(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i, v := range a {
-		if v != b[i] {
-			return false
-		}
-	}
-	return true
 }
