@@ -2,6 +2,7 @@ package util
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -53,5 +54,24 @@ func TestGetEnvAsInt(t *testing.T) {
 		if result != tt.expected {
 			t.Errorf("GetEnvAsInt(%s, %d) = %d; expected %d", tt.key, tt.fallback, result, tt.expected)
 		}
+	}
+}
+
+func TestCalculateResultName(t *testing.T) {
+	tests := []struct {
+		reportsAppDir string
+		imageName     string
+		wantResult    string
+	}{
+		{"/tmp", "registry.example.com/repo/image:tag", filepath.Join("/tmp", "registry.example.com_repo_image_tag.json")},
+		{"/tmp/foo", "registry.example.com/repo/subrepo/image:tag", filepath.Join("/tmp/foo", "registry.example.com_repo_subrepo_image_tag.json")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.imageName, func(t *testing.T) {
+			if gotResult := CalculateResultName(tt.imageName, tt.reportsAppDir); gotResult != tt.wantResult {
+				t.Errorf("calculateResultName(%q) = %q, want %q", tt.imageName, gotResult, tt.wantResult)
+			}
+		})
 	}
 }

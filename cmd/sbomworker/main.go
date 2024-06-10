@@ -60,12 +60,12 @@ func init() {
 
 	prometheusMetrics = metrics.NewMetrics(
 		prometheus.CounterOpts{
-			Name: "scanworker_processed_ops_total",
-			Help: "Total number of processed operations by the scanworker.",
+			Name: "sbomworker_processed_ops_total",
+			Help: "Total number of processed operations by the sbomworker.",
 		},
 		prometheus.CounterOpts{
-			Name: "scanworker_processed_errors_total",
-			Help: "Total number of processed errors by the scanworker.",
+			Name: "sbomworker_processed_errors_total",
+			Help: "Total number of processed errors by the sbomworker.",
 		},
 		commandExecutionHistogram,
 	)
@@ -89,7 +89,7 @@ func main() {
 		airbrakeNotifier.NotifyAirbrake(err)
 	}
 
-	go metrics.StartMetricsServer("8081")
+	go metrics.StartMetricsServer("8085")
 
 	// Start processing loop
 	for {
@@ -98,15 +98,15 @@ func main() {
 }
 
 func processQueue() {
-	// Block until an image name is available in the 'toscan' queue
-	redisAnswer, err := rdb.BRPop(ctx, 0, "toscan").Result()
+	// Block until an image name is available in the 'tosbom' queue
+	redisAnswer, err := rdb.BRPop(ctx, 0, "tosbom").Result()
 	if err != nil {
 		errorHandler.Handle(err)
 		return
 	}
 
 	// Split the answer
-	// [toscan registry.suse.com/bci/bci-busybox:latest|/app/images/trivy-scan-1918888852]
+	// [tosbom registry.suse.com/bci/bci-busybox:latest|/app/images/trivy-scan-1918888852]
 	parts := strings.Split(redisAnswer[1], "|")
 	if len(parts) != 2 {
 		err = fmt.Errorf("invalid format in Redis answer: %v", zap.Strings("parts", parts))
@@ -125,11 +125,10 @@ func processQueue() {
 	// Sanitize the image name to create a valid filename
 	resultFileName := util.CalculateResultName(imageName, reportsAppDir)
 
-	// when I add it here it b0rks???
-	logger.Info("Scanning image:", zap.String("image", imageName))
+	logger.Info("Fetching SBOM for image:", zap.String("image", imageName))
 	logger.Info("Saving results to:", zap.String("json_report", resultFileName))
 
-	cmdArgs := trivy.GenerateTrivyScanCmdArgs(resultFileName, target)
+	cmdArgs := trivy.GenerateTrivySBOMCmdArgs(resultFileName, target)
 
 	startTime := time.Now()
 	cmd := exec_command.NewExecShellCommander("trivy", cmdArgs...)
@@ -143,7 +142,7 @@ func processQueue() {
 	}
 
 	executionTime := time.Since(startTime).Seconds()
-	logger.Info("Scan complete for image:", zap.String("image", imageName), zap.String("json_report", resultFileName))
+	logger.Info("SBOM generation complete for image:", zap.String("image", imageName), zap.String("json_report", resultFileName))
 
 	if os.Getenv("PUSH_TO_CATALOG") != "" {
 		payload := pushworker.NewScanDTO()
