@@ -27,7 +27,7 @@ func (fn *fakeNotifier) AddTag(name string, value string) {
 	fn.Tags[name] = value
 }
 
-func TestProcessQueueReturnError(t *testing.T) {
+func TestProcessQueueReturnsError(t *testing.T) {
 	// gun := "registry.suse.com/bci/bci-busybox:latest"
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -89,5 +89,57 @@ func TestProcessQueueReturnError(t *testing.T) {
 		if !found {
 			t.Errorf("Expected log to contain error message 'trivy output: output, error: error error', but it was not found")
 		}
+	}
+}
+
+func TestProcessQueueReturnsSuccess(t *testing.T) {
+	// gun := "registry.suse.com/bci/bci-busybox:latest"
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	core, logs := observer.New(zap.ErrorLevel)
+	logger := zap.New(core)
+
+	mockNotifier := &fakeNotifier{
+		Tags: make(map[string]string),
+	}
+	sentryNotifier = mockNotifier
+
+	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, airbrakeNotifier, sentryNotifier)
+
+	mockShellCommand := mocks.NewMockIShellCommand(ctrl)
+	mockShellCommand.EXPECT().CombinedOutput().Return([]byte("output"), nil)
+
+	mockCommandFactory := func(name string, arg ...string) exec_command.IShellCommand {
+		return mockShellCommand
+	}
+
+	mr, err := miniredis.Run()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer mr.Close()
+
+	os.Setenv("REDIS_HOST", mr.Host())
+	os.Setenv("REDIS_PORT", mr.Port())
+	os.Setenv("IMAGES_APP_DIR", "/tmp")
+
+	// Initialize Redis client and push a mock entry
+	rdb = redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+
+	_, err = rdb.RPush(ctx, "toscan", "registry.suse.com/bci/bci-busybox:latest|/app/images/trivy-scan-1918888852").Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	processQueue(mockCommandFactory)
+
+	// Check if the log contains the desired error message.
+	if logs.Len() < 0 {
+		t.Errorf("Expected no error log")
 	}
 }
