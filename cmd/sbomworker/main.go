@@ -32,10 +32,10 @@ var (
 	logger                    *zap.Logger
 	prometheusMetrics         *metrics.Metrics
 	commandExecutionHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "trivy_execution_duration_seconds",
-		Help:    "Duration of trivy execution.",
+		Name:    "sbom_generation_duration_seconds",
+		Help:    "Duration of SBOM generation.",
 		Buckets: prometheus.LinearBuckets(0, 5, 20),
-	}, []string{"trivy"})
+	}, []string{"sbom"})
 )
 
 func init() {
@@ -93,11 +93,11 @@ func main() {
 
 	// Start processing loop
 	for {
-		processQueue()
+		processQueue(exec_command.NewExecShellCommander)
 	}
 }
 
-func processQueue() {
+func processQueue(commandFactory func(name string, arg ...string) exec_command.IShellCommand) {
 	// Block until an image name is available in the 'tosbom' queue
 	redisAnswer, err := rdb.BRPop(ctx, 0, "tosbom").Result()
 	if err != nil {
@@ -131,7 +131,7 @@ func processQueue() {
 	cmdArgs := trivy.GenerateTrivySBOMCmdArgs(resultFileName, target)
 
 	startTime := time.Now()
-	cmd := exec_command.NewExecShellCommander("trivy", cmdArgs...)
+	cmd := commandFactory("trivy", cmdArgs...)
 
 	if output, err := cmd.CombinedOutput(); err != nil {
 		if sentryNotifier != nil {
