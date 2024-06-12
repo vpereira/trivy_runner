@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestInitializeWorker(t *testing.T) {
@@ -33,6 +34,11 @@ func TestInitializeWorker(t *testing.T) {
 
 	// Call InitializeWorker
 	worker, err := InitializeWorker(config)
+
+	// Ensure to unregister metrics to avoid pollution across tests
+	defer prometheus.Unregister(worker.CommandExecutionHistogram)
+	defer prometheus.Unregister(worker.PrometheusMetrics.ProcessedOpsCounter)
+	defer prometheus.Unregister(worker.PrometheusMetrics.ProcessedErrorsCounter)
 
 	if err != nil {
 		t.Fatalf("Failed to initialize worker: %v", err)

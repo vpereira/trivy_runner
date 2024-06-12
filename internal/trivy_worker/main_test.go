@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"github.com/vpereira/trivy_runner/pkg/exec_command/mocks"
@@ -73,6 +74,11 @@ func TestProcessQueueReturnError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to initialize worker: %v", err)
 	}
+
+	// Ensure to unregister metrics to avoid pollution across tests
+	defer prometheus.Unregister(trivyWorker.CommandExecutionHistogram)
+	defer prometheus.Unregister(trivyWorker.PrometheusMetrics.ProcessedOpsCounter)
+	defer prometheus.Unregister(trivyWorker.PrometheusMetrics.ProcessedErrorsCounter)
 
 	// Inject the mocks into the TrivyWorker struct
 	trivyWorker.SentryNotifier = sentryNotifier

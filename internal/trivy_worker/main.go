@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/error_handler"
+	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/pushworker"
 	"github.com/vpereira/trivy_runner/internal/sentry"
 	"github.com/vpereira/trivy_runner/internal/trivy"
@@ -26,6 +27,7 @@ type TrivyWorker struct {
 	Logger                    *zap.Logger
 	ReportsAppDir             string
 	CommandExecutionHistogram *prometheus.HistogramVec
+	PrometheusMetrics         *metrics.Metrics
 	ProcessQueueName          string
 	ProcessFunc               func(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *TrivyWorker)
 	CommandFactory            func(name string, arg ...string) exec_command.IShellCommand
