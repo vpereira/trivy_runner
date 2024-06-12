@@ -15,25 +15,22 @@ import (
 	"go.uber.org/zap"
 )
 
-func InitializeWorker(queueName string, opsTotalName string, opsTotalHelp string, errorsTotalName string, errorsTotalHelp string, serverPort string) (*TrivyWorker, error) {
+func InitializeWorker(config Config) (*TrivyWorker, error) {
 	var err error
 	logger, err := zap.NewProduction()
 
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
-		return nil, err
 	}
 
 	airbrakeNotifier := airbrake.NewAirbrakeNotifier()
 	if airbrakeNotifier == nil {
 		logger.Error("Failed to create airbrake notifier")
-		return nil, err
 	}
 
 	sentryNotifier := sentry.NewSentryNotifier()
 	if sentryNotifier == nil {
 		logger.Error("Failed to create sentry notifier")
-		return nil, err
 	}
 
 	commandExecutionHistogram := prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -44,12 +41,12 @@ func InitializeWorker(queueName string, opsTotalName string, opsTotalHelp string
 
 	prometheusMetrics := metrics.NewMetrics(
 		prometheus.CounterOpts{
-			Name: opsTotalName,
-			Help: opsTotalHelp,
+			Name: config.OpsTotalName,
+			Help: config.OpsTotalHelp,
 		},
 		prometheus.CounterOpts{
-			Name: errorsTotalName,
-			Help: errorsTotalHelp,
+			Name: config.ErrorsTotalName,
+			Help: config.ErrorsTotalHelp,
 		},
 		commandExecutionHistogram,
 	)
@@ -69,10 +66,9 @@ func InitializeWorker(queueName string, opsTotalName string, opsTotalHelp string
 	if err != nil {
 		logger.Error("Failed to create base directory:", zap.String("dir", reportsAppDir), zap.Error(err))
 		airbrakeNotifier.NotifyAirbrake(err)
-		return nil, err
 	}
 
-	go metrics.StartMetricsServer(serverPort)
+	go metrics.StartMetricsServer(config.ServerPort)
 
 	return &TrivyWorker{
 		Ctx:                       context.Background(),
@@ -82,7 +78,7 @@ func InitializeWorker(queueName string, opsTotalName string, opsTotalHelp string
 		Logger:                    logger,
 		ReportsAppDir:             reportsAppDir,
 		CommandExecutionHistogram: commandExecutionHistogram,
-		ProcessQueueName:          queueName,
+		ProcessQueueName:          config.QueueName,
 		CommandFactory:            exec_command.NewExecShellCommander,
 		ProcessFunc:               ProcessQueue,
 	}, nil
