@@ -68,7 +68,9 @@ func InitializeWorker(config Config) (*TrivyWorker, error) {
 		airbrakeNotifier.NotifyAirbrake(err)
 	}
 
-	go metrics.StartMetricsServer(config.ServerPort)
+	if os.Getenv("SKIP_METRICS_SERVER") != "true" {
+		go metrics.StartMetricsServer(config.ServerPort)
+	}
 
 	return &TrivyWorker{
 		Ctx:                       context.Background(),

@@ -50,6 +50,7 @@ func TestProcessQueueReturnError(t *testing.T) {
 
 	os.Setenv("REDIS_HOST", mr.Host())
 	os.Setenv("REDIS_PORT", mr.Port())
+	os.Setenv("SKIP_METRICS_SERVER", "true")
 	os.Setenv("IMAGES_APP_DIR", "/tmp")
 
 	rdb := redis.NewClient(&redis.Options{
