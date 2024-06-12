@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/vpereira/trivy_runner/internal/trivy_worker"
+	"github.com/vpereira/trivy_runner/internal/util"
 )
 
 func main() {
@@ -13,7 +14,7 @@ func main() {
 		OpsTotalHelp:    "Total number of processed operations by the sbomworker.",
 		ErrorsTotalName: "sbomworker_processed_errors_total",
 		ErrorsTotalHelp: "Total number of processed errors by the sbomworker.",
-		ServerPort:      "8085",
+		ServerPort:      util.GetEnv("PROMETHEUS_EXPORTER_PORT", "8085"),
 	}
 
 	sbomWorker, err := trivy_worker.InitializeWorker(config)
