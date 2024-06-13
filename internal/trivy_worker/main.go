@@ -121,5 +121,6 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 			return
 		}
 	}
+	worker.PrometheusMetrics.IncOpsProcessed()
 	worker.CommandExecutionHistogram.WithLabelValues(imageName).Observe(executionTime)
 }
