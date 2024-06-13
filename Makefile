@@ -1,6 +1,6 @@
-.PHONY: all webapi pullworker scanworker pushworker getsizeworker test format lint
+.PHONY: all webapi pullworker scanworker pushworker sbomworker getsizeworker test format lint
 
-all: webapi pullworker scanworker pushworker getsizeworker
+all: webapi pullworker scanworker pushworker getsizeworker sbomworker
 
 test:
 	go test -v ./...
@@ -21,6 +21,9 @@ pushworker:
 
 getsizeworker:
 	go build -o ./bin/getsize_worker ./cmd/getsizeworker
+
+sbomworker:
+	go build -o ./bin/sbom_worker ./cmd/sbomworker
 
 integration-server:
 	-docker network create shared_network

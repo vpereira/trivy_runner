@@ -2,7 +2,9 @@ package util
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // GetEnv retrieves an environment variable or returns a default value.
@@ -43,4 +45,11 @@ func EqualSlice(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// Calculate the name of the result file for a given image name.
+func CalculateResultName(imageName string, reportsAppDir string) string {
+	safeImageName := strings.ReplaceAll(imageName, "/", "_")
+	safeImageName = strings.ReplaceAll(safeImageName, ":", "_")
+	return filepath.Join(reportsAppDir, safeImageName+".json")
 }
