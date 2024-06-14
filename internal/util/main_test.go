@@ -75,3 +75,21 @@ func TestCalculateResultName(t *testing.T) {
 		})
 	}
 }
+
+func TestSanitzedImageName(t *testing.T) {
+	tests := []struct {
+		imageName string
+		want      string
+	}{
+		{"registry.example.com/repo/image:tag", "registry.example.com_repo_image_tag"},
+		{"registry.example.com/repo/subrepo/image:tag", "registry.example.com_repo_subrepo_image_tag"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.imageName, func(t *testing.T) {
+			if got := SanitizeImageName(tt.imageName); got != tt.want {
+				t.Errorf("SanitizeImageName(%q) = %q, want %q", tt.imageName, got, tt.want)
+			}
+		})
+	}
+}
