@@ -145,7 +145,7 @@ func processQueue() {
 
 	imageName := result
 
-	imageNameSanitized := sanitizeImageName(imageName)
+	imageNameSanitized := util.SanitizeImageName(imageName)
 
 	targetDir, err := os.MkdirTemp(imagesAppDir, "trivy-scan-*")
 
@@ -232,9 +232,4 @@ func getFileSize(filePath string) (int64, error) {
 		return 0, err
 	}
 	return fileInfo.Size(), nil
-}
-
-// sanitizeImageName replaces slashes and colons in the image name with underscores.
-func sanitizeImageName(image string) string {
-	return strings.NewReplacer("/", "_", ":", "_").Replace(image)
 }

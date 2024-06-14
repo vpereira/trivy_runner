@@ -49,7 +49,11 @@ func EqualSlice(a, b []string) bool {
 
 // Calculate the name of the result file for a given image name.
 func CalculateResultName(imageName string, reportsAppDir string) string {
-	safeImageName := strings.ReplaceAll(imageName, "/", "_")
-	safeImageName = strings.ReplaceAll(safeImageName, ":", "_")
+	safeImageName := SanitizeImageName(imageName)
 	return filepath.Join(reportsAppDir, safeImageName+".json")
+}
+
+// SanitizeImageName replaces slashes and colons in the image name with underscores.
+func SanitizeImageName(image string) string {
+	return strings.NewReplacer("/", "_", ":", "_").Replace(image)
 }
