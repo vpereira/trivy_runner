@@ -15,6 +15,7 @@ func main() {
 		ErrorsTotalName: "pullworker_processed_errors_total",
 		ErrorsTotalHelp: "Total number of processed errors by the pullworker.",
 		ServerPort:      util.GetEnv("PROMETHEUS_EXPORTER_PORT", "8082"),
+		MultiArch:       false,
 	}
 
 	pullWorker, err := skopeo_worker.InitializeWorker(config)

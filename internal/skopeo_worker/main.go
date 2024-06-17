@@ -27,11 +27,12 @@ type SkopeoWorker struct {
 	CommandExecutionHistogram *prometheus.HistogramVec
 	PrometheusMetrics         *metrics.Metrics
 	ProcessQueueName          string
+	MultiArch                 bool
 	ProcessFunc               func(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker)
 	CommandFactory            func(name string, arg ...string) exec_command.IShellCommand
 }
 
-func NewSkopeoWorker(ctx context.Context, rdb *redis.Client, sentryNotifier sentry.Notifier, errorHandler *error_handler.ErrorHandler, logger *zap.Logger, imagesAppDir string, histogram *prometheus.HistogramVec, processQueueName string, processFunc func(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker), commandFactory func(name string, arg ...string) exec_command.IShellCommand) *SkopeoWorker {
+func NewSkopeoWorker(ctx context.Context, rdb *redis.Client, sentryNotifier sentry.Notifier, errorHandler *error_handler.ErrorHandler, logger *zap.Logger, imagesAppDir string, histogram *prometheus.HistogramVec, processQueueName string, multiArch bool, processFunc func(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker), commandFactory func(name string, arg ...string) exec_command.IShellCommand) *SkopeoWorker {
 	return &SkopeoWorker{
 		Ctx:                       ctx,
 		Rdb:                       rdb,
@@ -41,6 +42,7 @@ func NewSkopeoWorker(ctx context.Context, rdb *redis.Client, sentryNotifier sent
 		ImagesAppDir:              imagesAppDir,
 		CommandExecutionHistogram: histogram,
 		ProcessQueueName:          processQueueName,
+		MultiArch:                 multiArch,
 		ProcessFunc:               processFunc,
 		CommandFactory:            commandFactory,
 	}
