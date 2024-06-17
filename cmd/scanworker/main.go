@@ -15,6 +15,7 @@ func main() {
 		ErrorsTotalName: "scanworker_processed_errors_total",
 		ErrorsTotalHelp: "Total number of processed errors by the scanworker.",
 		ServerPort:      util.GetEnv("PROMETHEUS_EXPORTER_PORT", "8081"),
+		RunSBOMOnly:     false,
 	}
 
 	scanWorker, err := trivy_worker.InitializeWorker(config)
