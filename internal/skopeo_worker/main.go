@@ -70,9 +70,13 @@ func (w *SkopeoWorker) Run() {
 	}
 }
 
+func (w *SkopeoWorker) getProcessingQueueName() string {
+	return fmt.Sprintf("processing_%s", w.ProcessQueueName)
+}
+
 func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker) {
 	// Block until an image name is available in the 'topull' queue
-	result, err := worker.Rdb.BRPopLPush(worker.Ctx, "getsize", "processing_getsize", 0).Result()
+	result, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, worker.getProcessingQueueName(), 0).Result()
 
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
@@ -107,8 +111,8 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 	sizeResults := make(chan ImageSize, len(architectures))
 
 	startTime := time.Now()
-	// Move the image name from 'processing_getsize' to 'topush'
-	_, err = worker.Rdb.LRem(worker.Ctx, "processing_getsize", 1, imageName).Result()
+	// pull next from 'processing' queue
+	_, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(), 1, imageName).Result()
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
