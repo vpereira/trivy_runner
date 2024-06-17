@@ -82,6 +82,7 @@ func InitializeWorker(config Config) (*SkopeoWorker, error) {
 		CommandExecutionHistogram: commandExecutionHistogram,
 		PrometheusMetrics:         prometheusMetrics,
 		ProcessQueueName:          config.QueueName,
+		MultiArch:                 config.MultiArch,
 		CommandFactory:            exec_command.NewExecShellCommander,
 		ProcessFunc:               ProcessQueue,
 	}, nil
