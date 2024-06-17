@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/airbrake/gobrake/v5 v5.6.1
 	github.com/alicebob/miniredis/v2 v2.33.0
-	github.com/getsentry/sentry-go v0.28.0
+	github.com/getsentry/sentry-go v0.28.1
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/prometheus/client_golang v1.19.1
 	github.com/redis/go-redis/v9 v9.5.3
