@@ -15,6 +15,7 @@ func main() {
 		ErrorsTotalName: "sbomworker_processed_errors_total",
 		ErrorsTotalHelp: "Total number of processed errors by the sbomworker.",
 		ServerPort:      util.GetEnv("PROMETHEUS_EXPORTER_PORT", "8085"),
+		RunSBOMOnly:     true,
 	}
 
 	sbomWorker, err := trivy_worker.InitializeWorker(config)

@@ -29,11 +29,12 @@ type TrivyWorker struct {
 	CommandExecutionHistogram *prometheus.HistogramVec
 	PrometheusMetrics         *metrics.Metrics
 	ProcessQueueName          string
+	RunSBOMOnly               bool
 	ProcessFunc               func(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *TrivyWorker)
 	CommandFactory            func(name string, arg ...string) exec_command.IShellCommand
 }
 
-func NewTrivyWorker(ctx context.Context, rdb *redis.Client, sentryNotifier sentry.Notifier, errorHandler *error_handler.ErrorHandler, logger *zap.Logger, reportsAppDir string, histogram *prometheus.HistogramVec, processQueueName string, processFunc func(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *TrivyWorker), commandFactory func(name string, arg ...string) exec_command.IShellCommand) *TrivyWorker {
+func NewTrivyWorker(ctx context.Context, rdb *redis.Client, sentryNotifier sentry.Notifier, errorHandler *error_handler.ErrorHandler, logger *zap.Logger, reportsAppDir string, histogram *prometheus.HistogramVec, processQueueName string, runSBOMmonly bool, processFunc func(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *TrivyWorker), commandFactory func(name string, arg ...string) exec_command.IShellCommand) *TrivyWorker {
 	return &TrivyWorker{
 		Ctx:                       ctx,
 		Rdb:                       rdb,
@@ -43,6 +44,7 @@ func NewTrivyWorker(ctx context.Context, rdb *redis.Client, sentryNotifier sentr
 		ReportsAppDir:             reportsAppDir,
 		CommandExecutionHistogram: histogram,
 		ProcessQueueName:          processQueueName,
+		RunSBOMOnly:               runSBOMmonly,
 		ProcessFunc:               processFunc,
 		CommandFactory:            commandFactory,
 	}

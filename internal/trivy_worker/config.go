@@ -7,4 +7,5 @@ type Config struct {
 	ErrorsTotalName string
 	ErrorsTotalHelp string
 	ServerPort      string
+	RunSBOMOnly     bool
 }

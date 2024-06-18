@@ -76,7 +76,7 @@ func GetSupportedArchitectures(image string) ([]string, error) {
 			architectures = append(architectures, m.Platform.Architecture)
 		}
 		return architectures, nil
-	} else if manifest.MediaType == "application/vnd.docker.distribution.manifest.v2+json" {
+	} else if manifest.MediaType == "application/vnd.docker.distribution.manifest.v2+json" || manifest.MediaType == "application/vnd.oci.image.manifest.v1+json" {
 		return []string{"amd64"}, nil
 	}
 
