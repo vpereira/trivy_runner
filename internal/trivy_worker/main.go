@@ -87,7 +87,13 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 	worker.Logger.Info("Processing image:", zap.String("image", imageName))
 	worker.Logger.Info("Saving results to:", zap.String("json_report", resultFileName))
 
-	cmdArgs := trivy.GenerateTrivyScanCmdArgs(resultFileName, target) // Adjust based on the worker type
+	var cmdArgs []string
+
+	if worker.RunSBOMOnly {
+		cmdArgs = trivy.GenerateTrivySBOMCmdArgs(resultFileName, target)
+	} else {
+		cmdArgs = trivy.GenerateTrivyScanCmdArgs(resultFileName, target) // Adjust based on the worker type
+	}
 
 	startTime := time.Now()
 	cmd := commandFactory("trivy", cmdArgs...)
@@ -104,7 +110,13 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 	worker.Logger.Info("Processing complete for image:", zap.String("image", imageName), zap.String("json_report", resultFileName))
 
 	if os.Getenv("PUSH_TO_CATALOG") != "" {
-		payload := pushworker.NewScanDTO()
+		var payload pushworker.DTO
+		if worker.RunSBOMOnly {
+			payload = pushworker.NewSBOMDTO()
+		} else {
+			payload = pushworker.NewScanDTO()
+		}
+
 		payload.ResultFilePath = resultFileName
 		payload.Image = imageName
 
