@@ -76,15 +76,24 @@ func (w *SkopeoWorker) getProcessingQueueName() string {
 }
 
 func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker) {
+
 	// Block until an image name is available in the 'topull' queue
-	result, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, worker.getProcessingQueueName(), 0).Result()
+	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, "processing", 0).Result()
 
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
 
-	imageName := result
+	// Decode the JSON message
+	var queueMessage util.PullWorkerQueueMessage
+	if err := json.Unmarshal([]byte(messageJSON), &queueMessage); err != nil {
+		worker.ErrorHandler.Handle(err)
+		return
+	}
+
+	imageName := queueMessage.ImageName
+	nextAction := queueMessage.NextAction
 
 	imageNameSanitized := util.SanitizeImageName(imageName)
 
@@ -98,6 +107,7 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 	worker.SentryNotifier.AddTag("image.name", imageName)
 	worker.Logger.Info("Processing image: ", zap.String("imageName", imageName))
 	worker.Logger.Info("Target directory: ", zap.String("targetDir", targetDir))
+	worker.Logger.Info("Next action: ", zap.String("nextAction", nextAction))
 
 	// Get the supported architectures for the image
 	architectures, err := skopeo.GetSupportedArchitectures(imageName)
