@@ -2,6 +2,7 @@ package skopeo_worker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
+	"github.com/vpereira/trivy_runner/internal/util"
 	"github.com/vpereira/trivy_runner/pkg/exec_command"
 	"github.com/vpereira/trivy_runner/pkg/exec_command/mocks"
 	"go.uber.org/mock/gomock"
@@ -57,7 +59,15 @@ func TestProcessQueue(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr: mr.Addr(),
 	})
-	_, err = rdb.RPush(context.Background(), "topull", "registry.suse.com/bci/bci-busybox:latest").Result()
+
+	queueName := util.PullWorkerQueueMessage{
+		ImageName:  "registry.suse.com/bci/bci-busybox:latest",
+		NextAction: "scan",
+	}
+
+	messageJSON, _ := json.Marshal(queueName)
+
+	_, err = rdb.RPush(context.Background(), "topull", messageJSON).Result()
 	if err != nil {
 		t.Fatal(err)
 	}

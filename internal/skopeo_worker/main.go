@@ -2,6 +2,7 @@ package skopeo_worker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -94,6 +95,7 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 		return
 	}
 
+	worker.SentryNotifier.AddTag("image.name", imageName)
 	worker.Logger.Info("Processing image: ", zap.String("imageName", imageName))
 	worker.Logger.Info("Target directory: ", zap.String("targetDir", targetDir))
 
@@ -167,24 +169,31 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 
 func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker) {
 	// Block until an image name is available in the 'topull' queue
-	result, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, "processing", 0).Result()
+	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, "processing", 0).Result()
+
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
+
+	// Decode the JSON message
+	var queueMessage util.PullWorkerQueueMessage
+	if err := json.Unmarshal([]byte(messageJSON), &queueMessage); err != nil {
+		worker.ErrorHandler.Handle(err)
+		return
+	}
+
+	imageName := queueMessage.ImageName
+	nextAction := queueMessage.NextAction
 
 	targetDir, err := os.MkdirTemp(worker.ImagesAppDir, "trivy-scan-*")
+
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
-	tarballFilename := fmt.Sprintf("%s/image.tar", targetDir)
 
-	imageName := result
-	if imageName == "" {
-		worker.ErrorHandler.Handle(err)
-		return
-	}
+	tarballFilename := fmt.Sprintf("%s/image.tar", targetDir)
 
 	toPullArch := "amd64"
 	supportedArchitectures, err := skopeo.GetSupportedArchitectures(imageName)
@@ -202,6 +211,7 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 	worker.Logger.Info("Architecture to pull: ", zap.String("architecture", toPullArch))
 	worker.Logger.Info("Target directory: ", zap.String("targetDir", targetDir))
 	worker.Logger.Info("Target tarball: ", zap.String("tarball", tarballFilename))
+	worker.Logger.Info("Next action: ", zap.String("nextAction", nextAction))
 
 	cmdArgs := skopeo.GenerateSkopeoCmdArgs(imageName, tarballFilename, toPullArch)
 	startTime := time.Now()
@@ -221,9 +231,14 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 	}
 
 	toScanString := fmt.Sprintf("%s|%s", imageName, tarballFilename)
-	worker.Logger.Info("Pushing image to toscan queue:", zap.String("image", toScanString))
+	worker.Logger.Info("Pushing image: ", zap.String("queue", nextAction), zap.String("image", toScanString))
 
-	err = worker.Rdb.LPush(worker.Ctx, "toscan", toScanString).Err()
+	if nextAction == "scan" {
+		err = worker.Rdb.LPush(worker.Ctx, "toscan", toScanString).Err()
+	} else {
+		err = worker.Rdb.LPush(worker.Ctx, "sbom", toScanString).Err()
+	}
+
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return

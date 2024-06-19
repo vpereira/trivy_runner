@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -8,13 +9,21 @@ import (
 	"github.com/go-redis/redismock/v9"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/vpereira/trivy_runner/internal/metrics"
+	"github.com/vpereira/trivy_runner/internal/util"
 )
 
 func TestHandleScan(t *testing.T) {
 	// Create a new instance of `redismock.ClientMock`
 	db, mock := redismock.NewClientMock()
 
-	mock.ExpectLPush("topull", "testimage").SetVal(1)
+	queueName := util.PullWorkerQueueMessage{
+		ImageName:  "testimage",
+		NextAction: "scan",
+	}
+
+	messageJSON, _ := json.Marshal(queueName)
+
+	mock.ExpectLPush("topull", messageJSON).SetVal(1)
 
 	rdb = db
 
