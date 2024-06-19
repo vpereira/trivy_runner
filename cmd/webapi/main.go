@@ -78,8 +78,24 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	queueName := util.PullWorkerQueueMessage{
+		ImageName:  imageName,
+		NextAction: "scan",
+	}
+
+	messageJSON, err := json.Marshal(queueName)
+
+	if err != nil {
+		errorHandler.Handle(err)
+		go prometheusMetrics.IncOpsProcessedErrors()
+		logger.Error("Failed to marshal JSON", zap.String("image", imageName), zap.Error(err))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// Push the image name to Redis
-	err := rdb.LPush(ctx, "topull", imageName).Err()
+	err = rdb.LPush(ctx, "topull", messageJSON).Err()
+
 	if err != nil {
 		errorHandler.Handle(err)
 		go prometheusMetrics.IncOpsProcessedErrors()
@@ -91,8 +107,6 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 	// Increment Prometheus counter in a goroutine
 	go prometheusMetrics.IncOpsProcessed()
 
-	// Respond with the path for the result
-	filePath := util.ImageToFilename(imageName)
-	response := map[string]string{"resultPath": filePath}
+	response := map[string]string{"image": imageName, "status": "queued"}
 	json.NewEncoder(w).Encode(response)
 }
