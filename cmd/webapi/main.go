@@ -45,8 +45,23 @@ func handleGetUncompressedSize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	queueName := util.PullWorkerQueueMessage{
+		ImageName:  imageName,
+		NextAction: "scan",
+	}
+
+	messageJSON, err := json.Marshal(queueName)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		go prometheusMetrics.IncOpsProcessedErrors()
+		logger.Error("Failed to unmarshal messageJSON", zap.String("image", imageName), zap.Error(err))
+		errorHandler.Handle(err)
+		return
+	}
+
 	// Push the image name to Redis
-	err := rdb.LPush(ctx, "getsize", imageName).Err()
+	err = rdb.LPush(ctx, "getsize", messageJSON).Err()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		go prometheusMetrics.IncOpsProcessedErrors()
@@ -58,7 +73,7 @@ func handleGetUncompressedSize(w http.ResponseWriter, r *http.Request) {
 	// Increment Prometheus counter in a goroutine
 	go prometheusMetrics.IncOpsProcessed()
 
-	response := map[string]string{"result": "ok"}
+	response := map[string]string{"image": imageName, "status": "queued"}
 	json.NewEncoder(w).Encode(response)
 }
 
