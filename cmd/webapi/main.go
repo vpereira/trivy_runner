@@ -17,7 +17,7 @@ import (
 	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
 	"github.com/vpereira/trivy_runner/internal/sentry"
-	"github.com/vpereira/trivy_runner/pkg/utils"
+	"github.com/vpereira/trivy_runner/internal/util"
 )
 
 var (
@@ -111,7 +111,7 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Construct the file path
-	filePath := utils.ImageToFilename(imageName)
+	filePath := util.ImageToFilename(imageName)
 
 	// Check if the file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -157,7 +157,7 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 	go prometheusMetrics.IncOpsProcessed()
 
 	// Respond with the path for the result
-	filePath := utils.ImageToFilename(imageName)
+	filePath := util.ImageToFilename(imageName)
 	response := map[string]string{"resultPath": filePath}
 	json.NewEncoder(w).Encode(response)
 }

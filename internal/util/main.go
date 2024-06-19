@@ -57,3 +57,15 @@ func CalculateResultName(imageName string, reportsAppDir string) string {
 func SanitizeImageName(image string) string {
 	return strings.NewReplacer("/", "_", ":", "_").Replace(image)
 }
+
+// ImageToFilename transforms a Docker image name into a file system-friendly filename.
+// If basePath is provided, it uses that as the base path; otherwise, it defaults to "/app/reports".
+func ImageToFilename(imageName string, basePath ...string) string {
+	defaultBasePath := "/app/reports"
+
+	if len(basePath) > 0 {
+		defaultBasePath = basePath[0]
+	}
+
+	return CalculateResultName(imageName, defaultBasePath)
+}
