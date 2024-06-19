@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 
 	"go.uber.org/zap"
 
@@ -35,7 +34,6 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/scan", logging.LoggingMiddleware(http.HandlerFunc(handleScan)))
 	http.Handle("/get-uncompressed-size", logging.LoggingMiddleware(http.HandlerFunc(handleGetUncompressedSize)))
-	http.Handle("/report", logging.LoggingMiddleware(http.HandlerFunc(handleReport)))
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -70,40 +68,6 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	response := map[string]string{"result": "ok"}
 	json.NewEncoder(w).Encode(response)
-}
-
-func handleReport(w http.ResponseWriter, r *http.Request) {
-	// Extract the image name from the query parameter
-	imageName := r.URL.Query().Get("image")
-	if imageName == "" {
-		http.Error(w, "Image name is required", http.StatusBadRequest)
-		go prometheusMetrics.IncOpsProcessedErrors()
-		return
-	}
-
-	// Construct the file path
-	filePath := util.ImageToFilename(imageName)
-
-	// Check if the file exists
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Report not found"})
-		go prometheusMetrics.IncOpsProcessedErrors()
-		return
-	}
-
-	// Read and return the file content
-	report, err := os.ReadFile(filePath)
-	if err != nil {
-		go prometheusMetrics.IncOpsProcessedErrors()
-		errorHandler.Handle(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Set the content type and write the response
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(report)
 }
 
 func handleScan(w http.ResponseWriter, r *http.Request) {
