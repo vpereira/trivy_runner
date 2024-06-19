@@ -78,7 +78,7 @@ func (w *SkopeoWorker) getProcessingQueueName() string {
 func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker) {
 
 	// Block until an image name is available in the 'topull' queue
-	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, "processing", 0).Result()
+	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, worker.getProcessingQueueName(), 0).Result()
 
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
@@ -179,7 +179,7 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 
 func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker) {
 	// Block until an image name is available in the 'topull' queue
-	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, "processing", 0).Result()
+	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, worker.getProcessingQueueName(), 0).Result()
 
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
@@ -234,7 +234,7 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 
 	executionTime := time.Since(startTime).Seconds()
 
-	_, err = worker.Rdb.LRem(worker.Ctx, "processing", 1, imageName).Result()
+	_, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(), 1, imageName).Result()
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
