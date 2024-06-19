@@ -12,10 +12,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
-	"github.com/vpereira/trivy_runner/internal/airbrake"
+	"github.com/vpereira/trivy_runner/internal/error_handler"
 	"github.com/vpereira/trivy_runner/internal/logging"
 	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
+	"github.com/vpereira/trivy_runner/internal/sentry"
 	"github.com/vpereira/trivy_runner/pkg/utils"
 )
 
@@ -23,8 +24,8 @@ var (
 	logger            *zap.Logger
 	ctx               = context.Background()
 	rdb               *redis.Client
-	airbrakeNotifier  *airbrake.AirbrakeNotifier
 	prometheusMetrics *metrics.Metrics
+	errorHandler      *error_handler.ErrorHandler
 )
 
 func init() {
@@ -34,9 +35,9 @@ func init() {
 		log.Fatal("Failed to create logger:", err)
 	}
 
-	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
-	if airbrakeNotifier == nil {
-		logger.Error("Failed to create airbrake notifier")
+	sentryNotifier := sentry.NewSentryNotifier()
+	if sentryNotifier == nil {
+		logger.Error("Failed to create sentry notifier")
 	}
 
 	prometheusMetrics = metrics.NewMetrics(
@@ -50,6 +51,8 @@ func init() {
 		},
 	)
 	prometheusMetrics.Register()
+
+	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, sentryNotifier)
 }
 
 func main() {
@@ -79,7 +82,7 @@ func handleGetUncompressedSize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		go prometheusMetrics.IncOpsProcessedErrors()
 		logger.Error("Failed to push image to queue", zap.String("image", imageName), zap.Error(err))
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 		return
 	}
 
@@ -121,8 +124,9 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	// Read and return the file content
 	report, err := os.ReadFile(filePath)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		go prometheusMetrics.IncOpsProcessedErrors()
+		errorHandler.Handle(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -142,10 +146,10 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 	// Push the image name to Redis
 	err := rdb.LPush(ctx, "topull", imageName).Err()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorHandler.Handle(err)
 		go prometheusMetrics.IncOpsProcessedErrors()
 		logger.Error("Failed to push image to queue", zap.String("image", imageName), zap.Error(err))
-		airbrakeNotifier.NotifyAirbrake(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

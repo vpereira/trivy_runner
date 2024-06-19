@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/error_handler"
 	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
@@ -21,11 +20,6 @@ func InitializeWorker(config Config) (*TrivyWorker, error) {
 
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
-	}
-
-	airbrakeNotifier := airbrake.NewAirbrakeNotifier()
-	if airbrakeNotifier == nil {
-		logger.Error("Failed to create airbrake notifier")
 	}
 
 	sentryNotifier := sentry.NewSentryNotifier()
@@ -58,14 +52,14 @@ func InitializeWorker(config Config) (*TrivyWorker, error) {
 
 	prometheusMetrics.Register()
 
-	errorHandler := error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, airbrakeNotifier, sentryNotifier)
+	errorHandler := error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, sentryNotifier)
 
 	rdb := redisutil.InitializeClient()
 
 	err = os.MkdirAll(reportsAppDir, os.ModePerm)
 	if err != nil {
 		logger.Error("Failed to create base directory:", zap.String("dir", reportsAppDir), zap.Error(err))
-		airbrakeNotifier.NotifyAirbrake(err)
+		errorHandler.Handle(err)
 	}
 
 	if os.Getenv("SKIP_METRICS_SERVER") != "true" {
