@@ -9,14 +9,6 @@ import (
 	"go.uber.org/zap/zaptest"
 )
 
-type MockAirbrakeNotifier struct {
-	NotifyCallCount int
-}
-
-func (m *MockAirbrakeNotifier) NotifyAirbrake(err error) {
-	m.NotifyCallCount++
-}
-
 type MockSentryNotifier struct {
 	NotifyCallCount int
 	Tags            map[string]string
@@ -33,20 +25,15 @@ func (m *MockSentryNotifier) AddTag(key string, value string) {
 func TestErrorHandler_Handle(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	errorsCounter := prometheus.NewCounter(prometheus.CounterOpts{})
-	mockAirbrake := &MockAirbrakeNotifier{}
 	mockSentry := &MockSentryNotifier{}
 
-	handler := NewErrorHandler(logger, errorsCounter, mockAirbrake, mockSentry)
+	handler := NewErrorHandler(logger, errorsCounter, mockSentry)
 
 	testError := errors.New("test error")
 	handler.Handle(testError)
 
 	if testutil.ToFloat64(errorsCounter) != 1 {
 		t.Errorf("Expected counter to be incremented once, got %f", testutil.ToFloat64(errorsCounter))
-	}
-
-	if mockAirbrake.NotifyCallCount != 1 {
-		t.Errorf("Expected Airbrake to be notified once, got %d", mockAirbrake.NotifyCallCount)
 	}
 
 	if mockSentry.NotifyCallCount != 1 {

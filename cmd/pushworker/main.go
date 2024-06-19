@@ -12,7 +12,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
-	"github.com/vpereira/trivy_runner/internal/airbrake"
 	"github.com/vpereira/trivy_runner/internal/error_handler"
 	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/pushworker"
@@ -25,7 +24,6 @@ var (
 	ctx               = context.Background()
 	rdb               *redis.Client
 	logger            *zap.Logger
-	airbrakeNotifier  *airbrake.AirbrakeNotifier
 	sentryNotifier    sentry.Notifier
 	errorHandler      *error_handler.ErrorHandler
 	prometheusMetrics *metrics.Metrics
@@ -38,12 +36,6 @@ func init() {
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
 	}
-	airbrakeNotifier = airbrake.NewAirbrakeNotifier()
-
-	if airbrakeNotifier == nil {
-		logger.Error("Failed to create airbrake notifier")
-	}
-
 	sentryNotifier = sentry.NewSentryNotifier()
 
 	if sentryNotifier == nil {
@@ -68,7 +60,7 @@ func main() {
 
 	prometheusMetrics.Register()
 
-	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, airbrakeNotifier, sentryNotifier)
+	errorHandler = error_handler.NewErrorHandler(logger, prometheusMetrics.ProcessedErrorsCounter, sentryNotifier)
 
 	webhookURL := os.Getenv("WEBHOOK_URL")
 
