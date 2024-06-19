@@ -37,14 +37,6 @@ Then if you want to scan a new image:
 ```
 curl "http://localhost:8080/scan?image=registry.suse.com/bci/bci-busybox:latest"
 ```
-
-Then to fetch the scan report:
-
-```
-curl "http://localhost:8080/report?image=registry.suse.com/bci/bci-busybox:latest"
-
-```
-
 ## Integration with registry catalog
 
 If you want to test integration together with registry catalog
