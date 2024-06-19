@@ -278,19 +278,10 @@ func downloadImageAndGetSize(image, architecture, filePath string, worker *Skope
 		return 0, fmt.Errorf("error verifying file creation: %s", err.Error())
 	}
 
-	size, err := getFileSize(filePath)
+	size, err := util.GetFileSize(filePath)
 	if err != nil {
 		return 0, err
 	}
 
 	return size, nil
-}
-
-// getFileSize returns the size of the file at the given path in bytes.
-func getFileSize(filePath string) (int64, error) {
-	fileInfo, err := os.Stat(filePath)
-	if err != nil {
-		return 0, err
-	}
-	return fileInfo.Size(), nil
 }
