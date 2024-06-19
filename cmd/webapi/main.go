@@ -37,7 +37,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func handleGetUncompressedSize(w http.ResponseWriter, r *http.Request) {
+func handleRequests(w http.ResponseWriter, r *http.Request, operation string) {
 	imageName := r.URL.Query().Get("image")
 	if imageName == "" {
 		http.Error(w, "Image name is required", http.StatusBadRequest)
@@ -47,34 +47,52 @@ func handleGetUncompressedSize(w http.ResponseWriter, r *http.Request) {
 
 	queueName := util.PullWorkerQueueMessage{
 		ImageName:  imageName,
-		NextAction: "scan",
+		NextAction: operation,
 	}
 
 	messageJSON, err := json.Marshal(queueName)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		go prometheusMetrics.IncOpsProcessedErrors()
-		logger.Error("Failed to unmarshal messageJSON", zap.String("image", imageName), zap.Error(err))
 		errorHandler.Handle(err)
+		go prometheusMetrics.IncOpsProcessedErrors()
+		logger.Error("Failed to marshal JSON", zap.String("image", imageName), zap.String("operation", operation), zap.Error(err))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Push the image name to Redis
-	err = rdb.LPush(ctx, "getsize", messageJSON).Err()
+	var queue string
+	switch operation {
+	case "getsize":
+		queue = "getsize"
+	case "scan":
+		queue = "topull"
+	default:
+		http.Error(w, "Invalid operation", http.StatusBadRequest)
+		go prometheusMetrics.IncOpsProcessedErrors()
+		return
+	}
+
+	err = rdb.LPush(ctx, queue, messageJSON).Err()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		go prometheusMetrics.IncOpsProcessedErrors()
-		logger.Error("Failed to push image to queue", zap.String("image", imageName), zap.Error(err))
 		errorHandler.Handle(err)
+		go prometheusMetrics.IncOpsProcessedErrors()
+		logger.Error("Failed to push image to queue", zap.String("image", imageName), zap.String("queue", queue), zap.Error(err))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Increment Prometheus counter in a goroutine
 	go prometheusMetrics.IncOpsProcessed()
 
 	response := map[string]string{"image": imageName, "status": "queued"}
 	json.NewEncoder(w).Encode(response)
+}
+
+func handleGetUncompressedSize(w http.ResponseWriter, r *http.Request) {
+	handleRequests(w, r, "getsize")
+}
+
+func handleScan(w http.ResponseWriter, r *http.Request) {
+	handleRequests(w, r, "scan")
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -82,46 +100,5 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	response := map[string]string{"result": "ok"}
-	json.NewEncoder(w).Encode(response)
-}
-
-func handleScan(w http.ResponseWriter, r *http.Request) {
-	imageName := r.URL.Query().Get("image")
-	if imageName == "" {
-		http.Error(w, "Image name is required", http.StatusBadRequest)
-		go prometheusMetrics.IncOpsProcessedErrors()
-		return
-	}
-
-	queueName := util.PullWorkerQueueMessage{
-		ImageName:  imageName,
-		NextAction: "scan",
-	}
-
-	messageJSON, err := json.Marshal(queueName)
-
-	if err != nil {
-		errorHandler.Handle(err)
-		go prometheusMetrics.IncOpsProcessedErrors()
-		logger.Error("Failed to marshal JSON", zap.String("image", imageName), zap.Error(err))
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Push the image name to Redis
-	err = rdb.LPush(ctx, "topull", messageJSON).Err()
-
-	if err != nil {
-		errorHandler.Handle(err)
-		go prometheusMetrics.IncOpsProcessedErrors()
-		logger.Error("Failed to push image to queue", zap.String("image", imageName), zap.Error(err))
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Increment Prometheus counter in a goroutine
-	go prometheusMetrics.IncOpsProcessed()
-
-	response := map[string]string{"image": imageName, "status": "queued"}
 	json.NewEncoder(w).Encode(response)
 }
