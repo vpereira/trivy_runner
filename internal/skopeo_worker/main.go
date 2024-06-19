@@ -95,6 +95,7 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 		return
 	}
 
+	worker.SentryNotifier.AddTag("image.name", imageName)
 	worker.Logger.Info("Processing image: ", zap.String("imageName", imageName))
 	worker.Logger.Info("Target directory: ", zap.String("targetDir", targetDir))
 
