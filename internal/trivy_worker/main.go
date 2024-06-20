@@ -2,9 +2,9 @@ package trivy_worker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -58,23 +58,33 @@ func (w *TrivyWorker) Run() {
 
 func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *TrivyWorker) {
 	// Block until an image name is available in the specified queue
-	redisAnswer, err := worker.Rdb.BRPop(worker.Ctx, 0, worker.ProcessQueueName).Result()
+	result, err := worker.Rdb.BRPop(worker.Ctx, 0, worker.ProcessQueueName).Result()
+
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
 
-	// Split the answer
-	// [queue_name image_name|target_path]
-	parts := strings.Split(redisAnswer[1], "|")
-	if len(parts) != 2 {
-		err = fmt.Errorf("invalid format in Redis answer: %v", parts)
+	// [queue_name "{my-json}"]
+	if len(result) != 2 {
+		err = fmt.Errorf("unexpected result length from Redis BRPop: %v", result)
 		worker.ErrorHandler.Handle(err)
 		return
 	}
 
-	imageName := parts[0]
-	target := parts[1]
+	messageJSON := result[1]
+
+	// Decode the JSON message
+	var queueMessage util.ScanWorkerQueueMessage
+	if err := json.Unmarshal([]byte(messageJSON), &queueMessage); err != nil {
+		err = fmt.Errorf("invalid format in Redis answer: %v", messageJSON)
+		worker.ErrorHandler.Handle(err)
+		return
+	}
+
+	imageName := queueMessage.ImageName
+	nextAction := queueMessage.NextAction
+	target := queueMessage.TarPath
 
 	worker.SentryNotifier.AddTag("gun", imageName)
 	worker.SentryNotifier.AddTag("target-dir", target)
@@ -86,13 +96,15 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 
 	worker.Logger.Info("Processing image:", zap.String("image", imageName))
 	worker.Logger.Info("Saving results to:", zap.String("json_report", resultFileName))
+	worker.Logger.Info("Next action:", zap.String("action", nextAction))
+	worker.Logger.Info("Target directory:", zap.String("target", target))
 
 	var cmdArgs []string
 
 	if worker.RunSBOMOnly {
 		cmdArgs = trivy.GenerateTrivySBOMCmdArgs(resultFileName, target)
 	} else {
-		cmdArgs = trivy.GenerateTrivyScanCmdArgs(resultFileName, target) // Adjust based on the worker type
+		cmdArgs = trivy.GenerateTrivyScanCmdArgs(resultFileName, target)
 	}
 
 	startTime := time.Now()
