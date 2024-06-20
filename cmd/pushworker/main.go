@@ -135,7 +135,6 @@ func extractResults(filePath string) (json.RawMessage, error) {
 
 func sendToWebhook(webhookURL string, result interface{}) {
 	jsonData, err := json.Marshal(result)
-	imageName := reflect.TypeOf(result).Name()
 
 	if err != nil {
 		errorHandler.Handle(err)
@@ -166,6 +165,7 @@ func sendToWebhook(webhookURL string, result interface{}) {
 		errorHandler.Handle(err)
 		return
 	}
-	logger.Info("Report sent successfully for image:", zap.String("image", imageName))
+	imageName := reflect.ValueOf(result).FieldByName("Image").String()
+	logger.Info("Report sent successfully for: ", zap.String("image", imageName))
 	prometheusMetrics.IncOpsProcessed()
 }
