@@ -85,6 +85,8 @@ func processQueue(webhookURL string) {
 		return
 	}
 
+	logger.Info("Pushworker: Processing item", zap.String("item", answer[1]))
+
 	item := answer[1]
 
 	var dto pushworker.DTO
@@ -95,6 +97,8 @@ func processQueue(webhookURL string) {
 		errorHandler.Handle(err)
 		return
 	}
+
+	logger.Info("Processing item", zap.String("item", item))
 
 	payload := pushworker.NewPayload()
 	payload.Operation = dto.Operation

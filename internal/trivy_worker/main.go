@@ -65,7 +65,7 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 		return
 	}
 
-	// [queue_name "{my-json}"]
+	// [queue_name "{my-tar}"]
 	if len(result) != 2 {
 		err = fmt.Errorf("unexpected result length from Redis BRPop: %v", result)
 		worker.ErrorHandler.Handle(err)
@@ -139,9 +139,9 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 		}
 
 		toPushString := string(jsonData)
-		worker.Logger.Info("Pushing image scan to topush queue:", zap.String("payload", toPushString))
+		worker.Logger.Info("Pushing image to topush queue:", zap.String("payload", toPushString))
 
-		err = worker.Rdb.LPush(worker.Ctx, "topush", jsonData).Err()
+		err = worker.Rdb.LPush(worker.Ctx, "topush", toPushString).Err()
 		if err != nil {
 			worker.ErrorHandler.Handle(err)
 			return
