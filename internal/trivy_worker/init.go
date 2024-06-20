@@ -76,6 +76,7 @@ func InitializeWorker(config Config) (*TrivyWorker, error) {
 		CommandExecutionHistogram: commandExecutionHistogram,
 		PrometheusMetrics:         prometheusMetrics,
 		ProcessQueueName:          config.QueueName,
+		RunSBOMOnly:               config.RunSBOMOnly,
 		CommandFactory:            exec_command.NewExecShellCommander,
 		ProcessFunc:               ProcessQueue,
 	}, nil

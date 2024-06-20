@@ -33,7 +33,8 @@ func main() {
 	http.Handle("/health", logging.LoggingMiddleware(http.HandlerFunc(handleHealth)))
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/scan", logging.LoggingMiddleware(http.HandlerFunc(handleScan)))
-	http.Handle("/get-uncompressed-size", logging.LoggingMiddleware(http.HandlerFunc(handleGetUncompressedSize)))
+	http.Handle("/sbom", logging.LoggingMiddleware(http.HandlerFunc(handleSBOM)))
+	http.Handle("/size", logging.LoggingMiddleware(http.HandlerFunc(handleGetUncompressedSize)))
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -64,7 +65,7 @@ func handleRequests(w http.ResponseWriter, r *http.Request, operation string) {
 	switch operation {
 	case "getsize":
 		queue = "getsize"
-	case "scan":
+	case "scan", "sbom":
 		queue = "topull"
 	default:
 		http.Error(w, "Invalid operation", http.StatusBadRequest)
@@ -85,6 +86,10 @@ func handleRequests(w http.ResponseWriter, r *http.Request, operation string) {
 
 	response := map[string]string{"image": imageName, "status": "queued"}
 	json.NewEncoder(w).Encode(response)
+}
+
+func handleSBOM(w http.ResponseWriter, r *http.Request) {
+	handleRequests(w, r, "sbom")
 }
 
 func handleGetUncompressedSize(w http.ResponseWriter, r *http.Request) {

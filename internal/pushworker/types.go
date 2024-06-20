@@ -53,15 +53,9 @@ type ScanPayload struct {
 	Results json.RawMessage `json:"results"`
 }
 
-type SBOMPayload struct {
-	RanSBOMAt   string          `json:"sbom_ran_at"`
-	SBOMResults json.RawMessage `json:"sbom_results"`
-}
-
 type Payload struct {
 	ScanPayload
 	GetSizePayload
-	SBOMPayload
 	Image     string `json:"image"`
 	Operation string `json:"operation"`
 }

@@ -240,13 +240,25 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 		return
 	}
 
-	toScanString := fmt.Sprintf("%s|%s", imageName, tarballFilename)
-	worker.Logger.Info("Pushing image: ", zap.String("queue", nextAction), zap.String("image", toScanString))
+	toScanStruct := util.ScanWorkerQueueMessage{
+		ImageName:  imageName,
+		NextAction: nextAction,
+		TarPath:    tarballFilename,
+	}
+
+	toScanJSON, err := json.Marshal(toScanStruct)
+
+	if err != nil {
+		worker.ErrorHandler.Handle(err)
+		return
+	}
+
+	worker.Logger.Info("Pushing image: ", zap.String("action", nextAction), zap.String("image", imageName), zap.String("tarball", tarballFilename))
 
 	if nextAction == "scan" {
-		err = worker.Rdb.LPush(worker.Ctx, "toscan", toScanString).Err()
+		err = worker.Rdb.LPush(worker.Ctx, "toscan", toScanJSON).Err()
 	} else {
-		err = worker.Rdb.LPush(worker.Ctx, "sbom", toScanString).Err()
+		err = worker.Rdb.LPush(worker.Ctx, "tosbom", toScanJSON).Err()
 	}
 
 	if err != nil {
