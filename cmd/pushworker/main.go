@@ -106,7 +106,7 @@ func processQueue(webhookURL string) {
 	payload.Sizes = dto.Sizes
 
 	if dto.ResultFilePath != "" {
-		scanResults, err := extractResults(dto.ResultFilePath)
+		scanResults, err := extractResults(dto.ResultFilePath, dto.Operation)
 		if err != nil {
 			logger.Info("Could not extract scan results", zap.String("item", item), zap.Error(err))
 			errorHandler.Handle(err)
@@ -120,21 +120,15 @@ func processQueue(webhookURL string) {
 	go sendToWebhook(webhookURL, payload)
 }
 
-func extractResults(filePath string) (json.RawMessage, error) {
+func extractResults(filePath string, operation string) (json.RawMessage, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		errorHandler.Handle(err)
 		return nil, err
 	}
 
-	// unmarshal the data
-	var result pushworker.ScanPayload
-	err = json.Unmarshal(data, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result.Results, nil
+	extractor := pushworker.NewExtractor(operation, data)
+	return extractor.Extract()
 }
 
 func sendToWebhook(webhookURL string, result interface{}) {

@@ -66,11 +66,14 @@ func TestPayloadSerialization(t *testing.T) {
 		GetSizePayload: GetSizePayload{
 			Sizes: map[string]int64{"amd64": 12345},
 		},
+		SBOMPayload: SBOMPayload{
+			Components: json.RawMessage(`{"example": "sbom result"}`),
+		},
 		Image:     "test_image",
 		Operation: "test_operation",
 	}
 
-	expectedJSON := `{"ran_at":"2024-06-18T14:33:20+00:00","results":{"example":"scan result"},"uncompressed_sizes":{"amd64":12345},"image":"test_image","operation":"test_operation"}`
+	expectedJSON := `{"ran_at":"2024-06-18T14:33:20+00:00","results":{"example":"scan result"},"uncompressed_sizes":{"amd64":12345},"components":{"example":"sbom result"},"image":"test_image","operation":"test_operation"}`
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {

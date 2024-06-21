@@ -53,9 +53,14 @@ type ScanPayload struct {
 	Results json.RawMessage `json:"results"`
 }
 
+type SBOMPayload struct {
+	Components json.RawMessage `json:"components"`
+}
+
 type Payload struct {
 	ScanPayload
 	GetSizePayload
+	SBOMPayload
 	Image     string `json:"image"`
 	Operation string `json:"operation"`
 }
