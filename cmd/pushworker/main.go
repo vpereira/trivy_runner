@@ -127,22 +127,8 @@ func extractResults(filePath string, operation string) (json.RawMessage, error) 
 		return nil, err
 	}
 
-	// unmarshal the data
-	if operation == "sbom" {
-		var result pushworker.SBOMPlayload
-		err = json.Unmarshal(data, &result)
-		if err != nil {
-			return nil, err
-		}
-		return result.Components, nil
-	} else {
-		var result pushworker.ScanPayload
-		err = json.Unmarshal(data, &result)
-		if err != nil {
-			return nil, err
-		}
-		return result.Results, nil
-	}
+	extractor := pushworker.NewExtractor(operation, data)
+	return extractor.Extract()
 }
 
 func sendToWebhook(webhookURL string, result interface{}) {

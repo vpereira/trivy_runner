@@ -66,7 +66,7 @@ func TestPayloadSerialization(t *testing.T) {
 		GetSizePayload: GetSizePayload{
 			Sizes: map[string]int64{"amd64": 12345},
 		},
-		SBOMPlayload: SBOMPlayload{
+		SBOMPayload: SBOMPayload{
 			Components: json.RawMessage(`{"example": "sbom result"}`),
 		},
 		Image:     "test_image",
