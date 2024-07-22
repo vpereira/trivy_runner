@@ -85,6 +85,8 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 		return
 	}
 
+	defer worker.Rdb.Del(worker.Ctx, worker.getProcessingQueueName()).Result()
+
 	// Decode the JSON message
 	var queueMessage util.PullWorkerQueueMessage
 	if err := json.Unmarshal([]byte(messageJSON), &queueMessage); err != nil {
@@ -124,11 +126,13 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 
 	startTime := time.Now()
 	// pull next from 'processing' queue
-	_, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(), 1, imageName).Result()
+	_, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(), 1, messageJSON).Result()
+
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
+
 	for _, arch := range architectures {
 		wg.Add(1)
 		go func(architecture string) {
@@ -180,6 +184,7 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker) {
 	// Block until an image name is available in the 'topull' queue
 	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, worker.getProcessingQueueName(), 0).Result()
+	defer worker.Rdb.Del(worker.Ctx, worker.getProcessingQueueName()).Result()
 
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
@@ -227,6 +232,7 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 	startTime := time.Now()
 
 	cmd := commandFactory("skopeo", cmdArgs...)
+
 	if output, err := cmd.CombinedOutput(); err != nil {
 		worker.ErrorHandler.Handle(fmt.Errorf("skopeo output: %s, error: %s", string(output), err.Error()))
 		return
@@ -234,7 +240,8 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 
 	executionTime := time.Since(startTime).Seconds()
 
-	_, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(), 1, imageName).Result()
+	_, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(), 1, messageJSON).Result()
+
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
