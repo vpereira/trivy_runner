@@ -75,18 +75,10 @@ func (w *SkopeoWorker) getProcessingQueueName(hostName string) string {
 	return fmt.Sprintf("processing_%s_%s", w.ProcessQueueName, hostName)
 }
 
+// ProcessQueueMultiArch processes images for multiple architectures.
 func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker) {
 
-	hostName, err := os.Hostname()
-
-	if err != nil {
-		worker.ErrorHandler.Handle(err)
-		return
-	}
-
-	// Block until an image name is available in the 'topull' queue
-	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, worker.getProcessingQueueName(hostName), 0).Result()
-
+	imageName, nextAction, messageJSON, hostName, err := commonSetup(worker)
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
@@ -94,48 +86,31 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 
 	defer worker.Rdb.Del(worker.Ctx, worker.getProcessingQueueName(hostName)).Result()
 
-	// Decode the JSON message
-	var queueMessage util.PullWorkerQueueMessage
-	if err := json.Unmarshal([]byte(messageJSON), &queueMessage); err != nil {
-		worker.ErrorHandler.Handle(err)
-		return
-	}
-
-	imageName := queueMessage.ImageName
-	nextAction := queueMessage.NextAction
-
 	imageNameSanitized := util.SanitizeImageName(imageName)
 
 	targetDir, err := os.MkdirTemp(worker.ImagesAppDir, "trivy-scan-*")
-
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
+	defer os.RemoveAll(targetDir)
 
 	worker.SentryNotifier.AddTag("image.name", imageName)
 	worker.Logger.Info("Processing image: ", zap.String("imageName", imageName))
 	worker.Logger.Info("Target directory: ", zap.String("targetDir", targetDir))
 	worker.Logger.Info("Next action: ", zap.String("nextAction", nextAction))
 
-	// Get the supported architectures for the image
 	architectures, err := skopeo.GetSupportedArchitectures(imageName)
-
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
 
-	defer os.RemoveAll(targetDir)
-
 	var wg sync.WaitGroup
 	sizeResults := make(chan ImageSize, len(architectures))
 
 	startTime := time.Now()
-	// pull next from 'processing' queue
-	_, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(hostName), 1, messageJSON).Result()
-
-	if err != nil {
+	if _, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(hostName), 1, messageJSON).Result(); err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
@@ -168,19 +143,15 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 	payload.Image = imageName
 
 	jsonData, err := payload.ToJSON()
-
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
 
 	toPushString := string(jsonData)
-
 	worker.Logger.Info("Pushing image uncompressed size to topush queue:", zap.String("payload", toPushString))
 
-	err = worker.Rdb.LPush(worker.Ctx, "topush", toPushString).Err()
-
-	if err != nil {
+	if err = worker.Rdb.LPush(worker.Ctx, "topush", toPushString).Err(); err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
@@ -188,38 +159,23 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 	worker.PrometheusMetrics.IncOpsProcessed()
 }
 
+// ProcessQueue processes images for a single architecture.
 func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker) {
-	hostName, err := os.Hostname()
 
+	imageName, nextAction, messageJSON, hostName, err := commonSetup(worker)
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
-	// Block until an image name is available in the 'topull' queue
-	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, worker.getProcessingQueueName(hostName), 0).Result()
+
 	defer worker.Rdb.Del(worker.Ctx, worker.getProcessingQueueName(hostName)).Result()
 
-	if err != nil {
-		worker.ErrorHandler.Handle(err)
-		return
-	}
-
-	// Decode the JSON message
-	var queueMessage util.PullWorkerQueueMessage
-	if err := json.Unmarshal([]byte(messageJSON), &queueMessage); err != nil {
-		worker.ErrorHandler.Handle(err)
-		return
-	}
-
-	imageName := queueMessage.ImageName
-	nextAction := queueMessage.NextAction
-
 	targetDir, err := os.MkdirTemp(worker.ImagesAppDir, "trivy-scan-*")
-
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
+	defer os.RemoveAll(targetDir)
 
 	tarballFilename := fmt.Sprintf("%s/image.tar", targetDir)
 
@@ -253,9 +209,7 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 
 	executionTime := time.Since(startTime).Seconds()
 
-	_, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(hostName), 1, messageJSON).Result()
-
-	if err != nil {
+	if _, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(hostName), 1, messageJSON).Result(); err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
@@ -267,7 +221,6 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 	}
 
 	toScanJSON, err := json.Marshal(toScanStruct)
-
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
@@ -290,6 +243,7 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 	worker.PrometheusMetrics.IncOpsProcessed()
 }
 
+// downloadImageAndGetSize downloads the image and returns its size.
 func downloadImageAndGetSize(image, architecture, filePath string, worker *SkopeoWorker) (int64, error) {
 	cmdArgs := skopeo.GenerateSkopeoCmdArgs(image, filePath, architecture)
 
@@ -298,7 +252,6 @@ func downloadImageAndGetSize(image, architecture, filePath string, worker *Skope
 	cmd := exec_command.NewExecShellCommander("skopeo", cmdArgs...)
 
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		return 0, fmt.Errorf("skopeo output: %s, error: %s", string(output), err.Error())
 	}
@@ -316,4 +269,30 @@ func downloadImageAndGetSize(image, architecture, filePath string, worker *Skope
 	}
 
 	return size, nil
+}
+
+// commonSetup performs common setup tasks for both single and multi-arch processing.
+func commonSetup(worker *SkopeoWorker) (string, string, string, string, error) {
+	hostName, err := os.Hostname()
+	if err != nil {
+		worker.ErrorHandler.Handle(err)
+		return "", "", "", "", err
+	}
+
+	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, worker.getProcessingQueueName(hostName), 0).Result()
+	if err != nil {
+		worker.ErrorHandler.Handle(err)
+		return "", "", "", "", err
+	}
+
+	var queueMessage util.PullWorkerQueueMessage
+	if err := json.Unmarshal([]byte(messageJSON), &queueMessage); err != nil {
+		worker.ErrorHandler.Handle(err)
+		return "", "", "", "", err
+	}
+
+	imageName := queueMessage.ImageName
+	nextAction := queueMessage.NextAction
+
+	return imageName, nextAction, messageJSON, hostName, nil
 }
