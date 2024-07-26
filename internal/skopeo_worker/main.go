@@ -84,6 +84,8 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 		return
 	}
 
+	defer worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(hostName), 1, messageJSON).Result()
+
 	imageNameSanitized := util.SanitizeImageName(imageName)
 
 	targetDir, err := os.MkdirTemp(worker.ImagesAppDir, "trivy-scan-*")
@@ -165,6 +167,8 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 		worker.ErrorHandler.Handle(err)
 		return
 	}
+
+	defer worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(hostName), 1, messageJSON).Result()
 
 	targetDir, err := os.MkdirTemp(worker.ImagesAppDir, "trivy-scan-*")
 
