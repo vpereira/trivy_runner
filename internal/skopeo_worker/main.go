@@ -71,29 +71,18 @@ func (w *SkopeoWorker) Run() {
 	}
 }
 
-func (w *SkopeoWorker) getProcessingQueueName() string {
-	return fmt.Sprintf("processing_%s", w.ProcessQueueName)
+func (w *SkopeoWorker) getProcessingQueueName(hostName string) string {
+	return fmt.Sprintf("processing_%s_%s", w.ProcessQueueName, hostName)
 }
 
 func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker) {
 
-	// Block until an image name is available in the 'topull' queue
-	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, worker.getProcessingQueueName(), 0).Result()
+	imageName, nextAction, messageJSON, hostName, err := commonSetup(worker)
 
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
-
-	// Decode the JSON message
-	var queueMessage util.PullWorkerQueueMessage
-	if err := json.Unmarshal([]byte(messageJSON), &queueMessage); err != nil {
-		worker.ErrorHandler.Handle(err)
-		return
-	}
-
-	imageName := queueMessage.ImageName
-	nextAction := queueMessage.NextAction
 
 	imageNameSanitized := util.SanitizeImageName(imageName)
 
@@ -124,25 +113,16 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 
 	startTime := time.Now()
 	// pull next from 'processing' queue
-	_, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(), 1, imageName).Result()
+	_, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(hostName), 1, messageJSON).Result()
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
 	for _, arch := range architectures {
 		wg.Add(1)
-		go func(architecture string) {
-			defer wg.Done()
-			tarballFilename := filepath.Join(targetDir, fmt.Sprintf("%s_%s.tar", imageNameSanitized, architecture))
-			worker.Logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
-			size, err := downloadImageAndGetSize(imageName, architecture, tarballFilename, worker)
-			if err != nil {
-				worker.ErrorHandler.Handle(err)
-				return
-			}
-			sizeResults <- ImageSize{Architecture: architecture, Size: size}
-		}(arch)
+		go processArchitecture(arch, imageName, imageNameSanitized, targetDir, worker, sizeResults, &wg)
 	}
+
 	wg.Wait()
 	close(sizeResults)
 	executionTime := time.Since(startTime).Seconds()
@@ -179,22 +159,12 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 
 func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.IShellCommand, worker *SkopeoWorker) {
 	// Block until an image name is available in the 'topull' queue
-	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, worker.getProcessingQueueName(), 0).Result()
+	imageName, nextAction, messageJSON, hostName, err := commonSetup(worker)
 
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
 	}
-
-	// Decode the JSON message
-	var queueMessage util.PullWorkerQueueMessage
-	if err := json.Unmarshal([]byte(messageJSON), &queueMessage); err != nil {
-		worker.ErrorHandler.Handle(err)
-		return
-	}
-
-	imageName := queueMessage.ImageName
-	nextAction := queueMessage.NextAction
 
 	targetDir, err := os.MkdirTemp(worker.ImagesAppDir, "trivy-scan-*")
 
@@ -234,7 +204,7 @@ func ProcessQueue(commandFactory func(name string, arg ...string) exec_command.I
 
 	executionTime := time.Since(startTime).Seconds()
 
-	_, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(), 1, imageName).Result()
+	_, err = worker.Rdb.LRem(worker.Ctx, worker.getProcessingQueueName(hostName), 1, messageJSON).Result()
 	if err != nil {
 		worker.ErrorHandler.Handle(err)
 		return
@@ -296,4 +266,42 @@ func downloadImageAndGetSize(image, architecture, filePath string, worker *Skope
 	}
 
 	return size, nil
+}
+
+// commonSetup performs common setup tasks for both single and multi-arch processing.
+func commonSetup(worker *SkopeoWorker) (string, string, string, string, error) {
+	hostName, err := os.Hostname()
+	if err != nil {
+		worker.ErrorHandler.Handle(err)
+		return "", "", "", "", err
+	}
+
+	messageJSON, err := worker.Rdb.BRPopLPush(worker.Ctx, worker.ProcessQueueName, worker.getProcessingQueueName(hostName), 0).Result()
+	if err != nil {
+		worker.ErrorHandler.Handle(err)
+		return "", "", "", "", err
+	}
+
+	var queueMessage util.PullWorkerQueueMessage
+	if err := json.Unmarshal([]byte(messageJSON), &queueMessage); err != nil {
+		worker.ErrorHandler.Handle(err)
+		return "", "", "", "", err
+	}
+
+	imageName := queueMessage.ImageName
+	nextAction := queueMessage.NextAction
+
+	return imageName, nextAction, messageJSON, hostName, nil
+}
+
+func processArchitecture(architecture, imageName, imageNameSanitized, targetDir string, worker *SkopeoWorker, sizeResults chan<- ImageSize, wg *sync.WaitGroup) {
+	defer wg.Done()
+	tarballFilename := filepath.Join(targetDir, fmt.Sprintf("%s_%s.tar", imageNameSanitized, architecture))
+	worker.Logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
+	size, err := downloadImageAndGetSize(imageName, architecture, tarballFilename, worker)
+	if err != nil {
+		worker.ErrorHandler.Handle(err)
+		return
+	}
+	sizeResults <- ImageSize{Architecture: architecture, Size: size}
 }
