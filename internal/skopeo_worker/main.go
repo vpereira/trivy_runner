@@ -117,23 +117,14 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 
 	for _, arch := range architectures {
 		wg.Add(1)
-		go func(architecture string) {
-			defer wg.Done()
-			tarballFilename := filepath.Join(targetDir, fmt.Sprintf("%s_%s.tar", imageNameSanitized, architecture))
-			worker.Logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
-			size, err := downloadImageAndGetSize(imageName, architecture, tarballFilename, worker)
-			if err != nil {
-				worker.ErrorHandler.Handle(err)
-				return
-			}
-			sizeResults <- ImageSize{Architecture: architecture, Size: size}
-		}(arch)
+		go processArchitecture(arch, imageName, imageNameSanitized, targetDir, worker, sizeResults, &wg)
 	}
 	wg.Wait()
 	close(sizeResults)
 	executionTime := time.Since(startTime).Seconds()
 
 	sizes := make(map[string]int64)
+
 	for result := range sizeResults {
 		sizes[result.Architecture] = result.Size
 	}
@@ -155,6 +146,7 @@ func ProcessQueueMultiArch(commandFactory func(name string, arg ...string) exec_
 		worker.ErrorHandler.Handle(err)
 		return
 	}
+
 	worker.PrometheusMetrics.CommandExecutionDurationHistogram.WithLabelValues(imageName).Observe(executionTime)
 	worker.PrometheusMetrics.IncOpsProcessed()
 }
@@ -295,4 +287,16 @@ func commonSetup(worker *SkopeoWorker) (string, string, string, string, error) {
 	nextAction := queueMessage.NextAction
 
 	return imageName, nextAction, messageJSON, hostName, nil
+}
+
+func processArchitecture(architecture, imageName, imageNameSanitized, targetDir string, worker *SkopeoWorker, sizeResults chan<- ImageSize, wg *sync.WaitGroup) {
+	defer wg.Done()
+	tarballFilename := filepath.Join(targetDir, fmt.Sprintf("%s_%s.tar", imageNameSanitized, architecture))
+	worker.Logger.Info("Target tarball: ", zap.String("targetDir", tarballFilename))
+	size, err := downloadImageAndGetSize(imageName, architecture, tarballFilename, worker)
+	if err != nil {
+		worker.ErrorHandler.Handle(err)
+		return
+	}
+	sizeResults <- ImageSize{Architecture: architecture, Size: size}
 }
