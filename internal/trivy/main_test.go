@@ -38,7 +38,7 @@ func TestGenerateTrivyScanCmdArgs(t *testing.T) {
 			},
 			resultFileName: "/tmp/results/result.json",
 			targetDir:      "/tmp/images/image",
-			wantArgs:       []string{"image", "--slow", "--format", "json", "--output", "/tmp/results/result.json", "--input", "/tmp/images/image"},
+			wantArgs:       []string{"image", "--parallel", "1", "--format", "json", "--output", "/tmp/results/result.json", "--input", "/tmp/images/image"},
 		},
 	}
 
