@@ -1,12 +1,16 @@
-.PHONY: all webapi pullworker scanworker pushworker sbomworker getsizeworker test format lint
+.PHONY: all webapi pullworker scanworker pushworker sbomworker getsizeworker test format lint  redisexporter
 
-all: webapi pullworker scanworker pushworker getsizeworker sbomworker
+all: webapi pullworker scanworker pushworker getsizeworker sbomworker redisexporter
 
 test:
 	go test ./...
 
 format:
 	go fmt ./...
+
+redisexporter:
+	go build -o ./bin/redis_exporter ./cmd/redisexporter
+
 webapi:
 	go build -o ./bin/webapi ./cmd/webapi
 
@@ -31,5 +35,3 @@ integration-server:
 
 lint:
 	docker run --rm -v "$(CURDIR):/app" -w /app golangci/golangci-lint:v1.55.2 golangci-lint run -v
-
-
