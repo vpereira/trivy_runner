@@ -41,14 +41,16 @@ func initMetrics() {
 	})
 }
 
+// We parse the REDIS_QUEUES environment variable to get the list of queues
+// i.e REDIS_QUEUES="queueA queueB queueC"
 func getQueuesFromEnv() map[string]string {
 	queuesEnv := os.Getenv("REDIS_QUEUES")
 	queues := make(map[string]string)
 
 	if queuesEnv != "" {
-		queueList := strings.Fields(queuesEnv) // Split the string by whitespace
+		queueList := strings.Fields(queuesEnv)
 		for _, queueName := range queueList {
-			queues[queueName] = "" // Set each queue name with an empty string as the value
+			queues[queueName] = ""
 		}
 	}
 
@@ -70,7 +72,7 @@ func updateQueueMetrics(ctx context.Context, config Config) {
 				}
 				redisQueueLength.WithLabelValues(config.Hostname, queueName).Set(float64(length))
 			}
-			time.Sleep(10 * time.Second) // Update every 10 seconds
+			time.Sleep(10 * time.Second)
 		}
 	}
 }
@@ -90,12 +92,9 @@ func main() {
 		Hostname: hostName,
 	}
 
-	// Metrics are already registered inside initMetrics() with promauto
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start the metrics update in a separate goroutine
 	go updateQueueMetrics(ctx, config)
 	go metrics.StartMetricsServer("8086")
 
