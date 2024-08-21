@@ -14,13 +14,15 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/vpereira/trivy_runner/internal/metrics"
 	"github.com/vpereira/trivy_runner/internal/redisutil"
+	"github.com/vpereira/trivy_runner/internal/util"
 	"go.uber.org/zap"
 )
 
 type Config struct {
-	rdb      *redis.Client
-	Hostname string
-	Queues   map[string]string
+	rdb         *redis.Client
+	Hostname    string
+	Queues      map[string]string
+	Environment string
 }
 
 var (
@@ -36,7 +38,7 @@ func initMetrics() {
 				Name: "redis_queue_length",
 				Help: "Length of Redis queues",
 			},
-			[]string{"host", "queue_name"},
+			[]string{"host", "queue_name", "environment"},
 		)
 	})
 }
@@ -70,7 +72,7 @@ func updateQueueMetrics(ctx context.Context, config Config) {
 					logger.Error("Error getting length of queue", zap.String("queue", queueName), zap.Error(err))
 					continue
 				}
-				redisQueueLength.WithLabelValues(config.Hostname, queueName).Set(float64(length))
+				redisQueueLength.WithLabelValues(config.Hostname, queueName, config.Environment).Set(float64(length))
 			}
 			time.Sleep(10 * time.Second)
 		}
@@ -87,9 +89,10 @@ func main() {
 	initMetrics()
 
 	config := Config{
-		rdb:      rdb,
-		Queues:   queues,
-		Hostname: hostName,
+		rdb:         rdb,
+		Queues:      queues,
+		Hostname:    hostName,
+		Environment: util.GetEnv("TRIVY_ENV", "development"),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

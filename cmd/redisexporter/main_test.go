@@ -85,9 +85,10 @@ func TestUpdateQueueMetrics(t *testing.T) {
 	initMetrics() // Initialize the metrics
 
 	config := Config{
-		rdb:      rdb,
-		Hostname: "localhost",
-		Queues:   map[string]string{"queueA": "", "queueB": ""},
+		rdb:         rdb,
+		Hostname:    "localhost",
+		Queues:      map[string]string{"queueA": "", "queueB": ""},
+		Environment: "test",
 	}
 
 	// Create a context to control the lifecycle of the goroutine
@@ -101,12 +102,12 @@ func TestUpdateQueueMetrics(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Validate the metrics
-	metric := testutil.ToFloat64(redisQueueLength.WithLabelValues("localhost", "queueA"))
+	metric := testutil.ToFloat64(redisQueueLength.WithLabelValues("localhost", "queueA", "test"))
 	if metric != 3 {
 		t.Errorf("Expected metric value 3 for queueA, got %v", metric)
 	}
 
-	metric = testutil.ToFloat64(redisQueueLength.WithLabelValues("localhost", "queueB"))
+	metric = testutil.ToFloat64(redisQueueLength.WithLabelValues("localhost", "queueB", "test"))
 	if metric != 2 {
 		t.Errorf("Expected metric value 2 for queueB, got %v", metric)
 	}
