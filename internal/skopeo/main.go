@@ -67,6 +67,21 @@ func IsContainerImage(mediaType string) bool {
 	return false
 }
 
+func IsUnknownArchitecture(arch string) bool {
+	// Unknown / Empty architectures reflect content that should not be treated
+	// as a "runnable" binary, they're there to provide metadata and the choice of value
+	// "" or "unknown" is to sway the clients from matching the legit architecture (amd64, ppc64, etc.)
+	// against these metadata stores.
+	switch arch {
+	case
+		"",
+		"unknown":
+		return true
+	}
+
+	return false
+}
+
 // GetSupportedArchitectures gets the list of supported architectures for a Docker image.
 func GetSupportedArchitectures(image string) ([]string, error) {
 	cmdArgs := GenerateSkopeoInspectCmdArgs(image)
@@ -93,6 +108,9 @@ func GetSupportedArchitectures(image string) ([]string, error) {
 		// Collect all architectures from a manifestlist
 		var architectures []string
 		for _, m := range manifest.Manifests {
+			if IsUnknownArchitecture(m.Platform.Architecture) {
+				continue
+			}
 			architectures = append(architectures, m.Platform.Architecture)
 		}
 		return architectures, nil
