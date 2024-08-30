@@ -47,6 +47,26 @@ func GenerateSkopeoCmdArgs(imageName, targetFilename, architecture string) []str
 	return cmdArgs
 }
 
+func IsManifestList(mediaType string) bool {
+	switch mediaType {
+	case
+		"application/vnd.docker.distribution.manifest.list.v2+json",
+		"application/vnd.oci.image.index.v1+json":
+		return true
+	}
+	return false
+}
+
+func IsContainerImage(mediaType string) bool {
+	switch mediaType {
+	case
+		"application/vnd.docker.distribution.manifest.v2+json",
+		"application/vnd.oci.image.manifest.v1+json":
+		return true
+	}
+	return false
+}
+
 // GetSupportedArchitectures gets the list of supported architectures for a Docker image.
 func GetSupportedArchitectures(image string) ([]string, error) {
 	cmdArgs := GenerateSkopeoInspectCmdArgs(image)
@@ -69,14 +89,15 @@ func GetSupportedArchitectures(image string) ([]string, error) {
 		return nil, err
 	}
 
-	// Check the media type
-	if manifest.MediaType == "application/vnd.docker.distribution.manifest.list.v2+json" {
+	if IsManifestList(manifest.MediaType) {
+		// Collect all architectures from a manifestlist
 		var architectures []string
 		for _, m := range manifest.Manifests {
 			architectures = append(architectures, m.Platform.Architecture)
 		}
 		return architectures, nil
-	} else if manifest.MediaType == "application/vnd.docker.distribution.manifest.v2+json" || manifest.MediaType == "application/vnd.oci.image.manifest.v1+json" {
+	} else if IsContainerImage(manifest.MediaType) {
+		// Assume amd64 when a container is sent
 		return []string{"amd64"}, nil
 	}
 
