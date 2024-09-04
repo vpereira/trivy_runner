@@ -15,12 +15,15 @@ func GenerateTrivyScanCmdArgs(resultFileName, target string) []string {
 	cmdArgs := []string{"image"}
 
 	// Check if SLOW_RUN environment variable is set to "1" and add "--slow" parameter
-	slowRun := util.GetEnv("SLOW_RUN", "0")
-	if slowRun == "1" {
-		cmdArgs = append(cmdArgs, "--parallel", "1")
+	timeout := util.GetEnv("SCAN_TIMEOUT", "5m")
+
+	parallelism := util.GetEnv("SCAN_PARALLELISM", "0") // 0 means auto-detect
+
+	if parallelism != "0" {
+		cmdArgs = append(cmdArgs, "--parallel", parallelism)
 	}
 
-	cmdArgs = append(cmdArgs, "--format", "json", "--output", resultFileName, "--input", target)
+	cmdArgs = append(cmdArgs, "--format", "json", "--timeout", timeout, "--output", resultFileName, "--input", target)
 
 	return cmdArgs
 }

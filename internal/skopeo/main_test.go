@@ -101,3 +101,102 @@ func TestGenerateSkopeoCmdArgs(t *testing.T) {
 		}
 	}
 }
+
+func TestManifestListDetection(t *testing.T) {
+	inputs := []struct {
+		MediaType string
+		Result    bool
+	}{
+		{
+			MediaType: "application/vnd.docker.distribution.manifest.list.v2+json",
+			Result:    true,
+		},
+		{
+			MediaType: "application/vnd.oci.image.index.v1+json",
+			Result:    true,
+		},
+		{
+			MediaType: "application/vnd.docker.distribution.manifest.v2+json",
+			Result:    false,
+		},
+		{
+			MediaType: "application/vnd.oci.image.manifest.v1+json",
+			Result:    false,
+		},
+	}
+
+	for _, input := range inputs {
+		expected := input.Result
+		got := IsManifestList(input.MediaType)
+
+		if got != expected {
+			t.Errorf("Unexpected mismatch, got: %v; expected: %v for %v", got, expected, input.MediaType)
+		}
+	}
+}
+
+func TestIsContainerImageDetection(t *testing.T) {
+	inputs := []struct {
+		MediaType string
+		Result    bool
+	}{
+		{
+			MediaType: "application/vnd.docker.distribution.manifest.v2+json",
+			Result:    true,
+		},
+		{
+			MediaType: "application/vnd.oci.image.manifest.v1+json",
+			Result:    true,
+		},
+		{
+			MediaType: "application/vnd.docker.distribution.manifest.list.v2+json",
+			Result:    false,
+		},
+		{
+			MediaType: "application/vnd.oci.image.index.v1+json",
+			Result:    false,
+		},
+	}
+
+	for _, input := range inputs {
+		expected := input.Result
+		got := IsContainerImage(input.MediaType)
+
+		if got != expected {
+			t.Errorf("Unexpected mismatch, got: %v; expected: %v for %v", got, expected, input.MediaType)
+		}
+	}
+}
+
+func TestIsUnknownArchitectureDetection(t *testing.T) {
+	inputs := []struct {
+		Architecture string
+		Result       bool
+	}{
+		{
+			Architecture: "",
+			Result:       true,
+		},
+		{
+			Architecture: "unknown",
+			Result:       true,
+		},
+		{
+			Architecture: "amd64",
+			Result:       false,
+		},
+		{
+			Architecture: "arm64",
+			Result:       false,
+		},
+	}
+
+	for _, input := range inputs {
+		expected := input.Result
+		got := IsUnknownArchitecture(input.Architecture)
+
+		if got != expected {
+			t.Errorf("Unexpected mismatch, got: %v; expected: %v for %v", got, expected, input.Architecture)
+		}
+	}
+}

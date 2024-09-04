@@ -19,26 +19,50 @@ func TestGenerateTrivyScanCmdArgs(t *testing.T) {
 		{
 			name: "Normal run",
 			setupEnv: func() {
-				os.Setenv("SLOW_RUN", "0")
+				os.Setenv("SCAN_PARALLELISM", "0")
 			},
 			cleanupEnv: func() {
-				os.Unsetenv("SLOW_RUN")
+				os.Unsetenv("SCAN_PARALLELISM")
 			},
 			resultFileName: "/tmp/results/result.json",
 			targetDir:      "/tmp/images/image",
-			wantArgs:       []string{"image", "--format", "json", "--output", "/tmp/results/result.json", "--input", "/tmp/images/image"},
+			wantArgs:       []string{"image", "--format", "json", "--timeout", "5m", "--output", "/tmp/results/result.json", "--input", "/tmp/images/image"},
 		},
 		{
 			name: "Slow run",
 			setupEnv: func() {
-				os.Setenv("SLOW_RUN", "1")
+				os.Setenv("SCAN_PARALLELISM", "1")
 			},
 			cleanupEnv: func() {
-				os.Unsetenv("SLOW_RUN")
+				os.Unsetenv("SCAN_PARALLELISM")
 			},
 			resultFileName: "/tmp/results/result.json",
 			targetDir:      "/tmp/images/image",
-			wantArgs:       []string{"image", "--parallel", "1", "--format", "json", "--output", "/tmp/results/result.json", "--input", "/tmp/images/image"},
+			wantArgs:       []string{"image", "--parallel", "1", "--format", "json", "--timeout", "5m", "--output", "/tmp/results/result.json", "--input", "/tmp/images/image"},
+		},
+		{
+			name: "fast run",
+			setupEnv: func() {
+				os.Setenv("SCAN_PARALLELISM", "5")
+			},
+			cleanupEnv: func() {
+				os.Unsetenv("SCAN_PARALLELISM")
+			},
+			resultFileName: "/tmp/results/result.json",
+			targetDir:      "/tmp/images/image",
+			wantArgs:       []string{"image", "--parallel", "5", "--format", "json", "--timeout", "5m", "--output", "/tmp/results/result.json", "--input", "/tmp/images/image"},
+		},
+		{
+			name: "Longer timeout",
+			setupEnv: func() {
+				os.Setenv("SCAN_TIMEOUT", "10m")
+			},
+			cleanupEnv: func() {
+				os.Unsetenv("SCAN_TIMEOUT")
+			},
+			resultFileName: "/tmp/results/result.json",
+			targetDir:      "/tmp/images/image",
+			wantArgs:       []string{"image", "--format", "json", "--timeout", "10m", "--output", "/tmp/results/result.json", "--input", "/tmp/images/image"},
 		},
 	}
 
