@@ -1,4 +1,4 @@
-.PHONY: all webapi pullworker scanworker pushworker sbomworker getsizeworker test format lint  redisexporter
+.PHONY: all webapi pullworker scanworker pushworker sbomworker getsizeworker test format lint redisexporter integration
 
 all: webapi pullworker scanworker pushworker getsizeworker sbomworker redisexporter
 
@@ -29,7 +29,7 @@ getsizeworker:
 sbomworker:
 	go build -o ./bin/sbom_worker ./cmd/sbomworker
 
-integration-server:
+integration:
 	-docker network create shared_network
 	docker-compose -f docker-compose.yml -f docker-compose-integration.yml up
 

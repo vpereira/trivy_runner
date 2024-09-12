@@ -1,0 +1,11 @@
+# Start from a base image with Go installed
+FROM registry.opensuse.org/opensuse/bci/golang:latest
+
+WORKDIR /app
+
+COPY main.go ./
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o http-server-test main.go
+
+EXPOSE 8081
+CMD ["./http-server-test"]
