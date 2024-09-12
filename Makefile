@@ -29,9 +29,12 @@ getsizeworker:
 sbomworker:
 	go build -o ./bin/sbom_worker ./cmd/sbomworker
 
-integration:
+integration: build_integration
 	-docker network create shared_network
 	docker-compose -f docker-compose.yml -f docker-compose-integration.yml up
 
 lint:
 	docker run --rm -v "$(CURDIR):/app" -w /app golangci/golangci-lint:v1.55.2 golangci-lint run -v
+
+build_integration:
+	docker-compose -f docker-compose.yml -f docker-compose-integration.yml build
