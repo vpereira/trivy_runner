@@ -115,6 +115,17 @@ In the registry, we have a single image that will be scanned by the Trivy Runner
     curl "http://localhost:8080/size?image=registry:5000/busybox:latest"
     ```
 
+   To add more images to the local registry:
+   With integration environment running, in your local machine, step into the
+registry container:
+   ```bash
+   docker-compose exec registry bash
+   ```
+   And then use Skopeo to pull the new image
+   ```bash
+    skopeo copy --dest-tls-verify=false docker://registry.suse.com/suse/sle15:15.6 docker://localhost:5000/sle15:15.6
+   ```
+
 ## Features
 
 - Scans Docker images for security vulnerabilities using Trivy.
