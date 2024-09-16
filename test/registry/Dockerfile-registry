@@ -1,0 +1,26 @@
+# Use the official openSUSE Tumbleweed base image
+FROM opensuse/tumbleweed:latest
+
+# Install required packages: docker, distribution-registry, and sudo
+RUN zypper refresh && \
+    zypper install -y docker skopeo distribution-registry sudo && \
+    zypper clean
+
+# Expose port 5000 for the distribution registry
+EXPOSE 5000
+
+# Create a new user with UID 1000 and GID 100 named scc
+RUN  useradd -u 1000 -g 100 -m -s /bin/sh scc && \
+    echo 'scc ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# Set the default volume for the registry storage
+VOLUME /var/lib/docker-registry
+
+# Set the working directory to /var/lib/registry
+WORKDIR /var/lib/docker-registry
+
+# Run the distribution registry as the user 'scc' with UID 1000
+USER 1000
+
+# Set the default command to start the registry
+CMD ["registry", "serve", "/etc/registry/config.yml"]

@@ -1,0 +1,15 @@
+# Similar structure to Dockerfile-webapi
+FROM registry.opensuse.org/opensuse/tumbleweed:latest
+
+RUN zypper -n install ca-certificates go trivy
+
+WORKDIR /app
+
+COPY go.* ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o sbomworker ./cmd/sbomworker
+
+CMD ["./sbomworker"]

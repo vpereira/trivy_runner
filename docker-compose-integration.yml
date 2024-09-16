@@ -1,5 +1,3 @@
-version: '3.8'
-
 networks:
   trivy-net:
     driver: bridge
@@ -7,6 +5,29 @@ networks:
     external: true
 
 services:
+  webhook:
+    build:
+      context: test/http-server-test
+      dockerfile: Dockerfile-webhook
+    ports:
+      # app listens on 8080 but we have to expose 8081
+      - "8081:8081"
+    networks:
+      - shared_network
+      - trivy-net
+  registry:
+    build:
+      context: test/registry
+      dockerfile: Dockerfile-registry
+    ports:
+      - "5000:5000"
+    networks:
+      - trivy-net
+      - shared_network
+    volumes:
+      - ./test/registry:/var/lib/docker-registry
+    environment:
+      - REGISTRY_STORAGE_DELETE_ENABLED=true
   webapi:
     networks:
       - trivy-net
@@ -16,7 +37,16 @@ services:
       - trivy-net
       - shared_network
     environment:
-      - WEBHOOK_URL=http://catalog:3000/webhooks/trivy_webhook
+      - WEBHOOK_URL=http://webhook:8081/webhooks/trivy_webhook
   scanworker:
     environment:
       - PUSH_TO_CATALOG=true
+  sbomworker:
+    environment:
+      - PUSH_TO_CATALOG=true
+  pullworker:
+    environment:
+      - SKIP_TLS=1
+  getsizeworker:
+    environment:
+      - SKIP_TLS=1

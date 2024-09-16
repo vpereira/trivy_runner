@@ -20,6 +20,12 @@ func GenerateSkopeoInspectCmdArgs(imageName string) []string {
 		cmdArgs = append(cmdArgs, "--username", registryUsername, "--password", registryPassword)
 	}
 
+	_, skipTLSSet := os.LookupEnv("SKIP_TLS")
+
+	if skipTLSSet {
+		cmdArgs = append(cmdArgs, "--tls-verify=false")
+	}
+
 	cmdArgs = append(cmdArgs, fmt.Sprintf("docker://%s", imageName))
 
 	return cmdArgs
@@ -34,6 +40,12 @@ func GenerateSkopeoCmdArgs(imageName, targetFilename, architecture string) []str
 
 	if usernameSet && passwordSet {
 		cmdArgs = append(cmdArgs, "--src-username", registryUsername, "--src-password", registryPassword)
+	}
+
+	_, skipTLSSet := os.LookupEnv("SKIP_TLS")
+
+	if skipTLSSet {
+		cmdArgs = append(cmdArgs, "--tls-verify=false")
 	}
 
 	// Add architecture override if specified

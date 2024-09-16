@@ -72,7 +72,7 @@ To run Trivy Runner locally for development purposes, follow these steps:
    bin/webapi
    ```
    With the WebAPI running, you can send jobs to it via `curl`. After the WebAPI submits the job to Redis, you can stop the WebAPI.
-   
+
 3. Run the `PullWorker`:
    ```bash
    IMAGES_APP_DIR=/tmp bin/pull_worker
@@ -92,17 +92,45 @@ At any time, you can inspect the Redis queues to help debug and ensure that traf
 
 ## Integration with Registry Catalog
 
-To test Trivy Runner in conjunction with a registry catalog, follow these steps:
+To test the whole process, you can use the `docker-compose-integration.yml` file to start the Trivy Runner, Registry backend and a local webserver emulating the catalog.
+In the registry, we have a single image that will be scanned by the Trivy Runner and pushed back to the emulated catalog.
 
-1. Review or modify the `docker-compose-integration.yml` file to suit your environment.
-2. Run the integration server:
+1. Run the integration server:
    ```bash
    make integration-server
+   ```
+
+2. You can then send commands against the Trivy Runner:
+   In your local dev machine, you can use the following commands to interact with the Trivy Runner:
+   To scan an image:
+   ```bash
+   curl "http://localhost:8080/scan?image=registry:5000/busybox:latest"
+   ```
+   To generate sbom:
+   ```bash
+    curl "http://localhost:8080/sbom?image=registry:5000/busybox:latest"
+    ```
+   To get the size of the image:
+   ```bash
+    curl "http://localhost:8080/size?image=registry:5000/busybox:latest"
+    ```
+
+   To add more images to the local registry:
+   With integration environment running, in your local machine, step into the
+registry container:
+   ```bash
+   docker-compose exec registry bash
+   ```
+   And then use Skopeo to pull the new image
+   ```bash
+    skopeo copy --dest-tls-verify=false docker://registry.suse.com/suse/sle15:15.6 docker://localhost:5000/sle15:15.6
    ```
 
 ## Features
 
 - Scans Docker images for security vulnerabilities using Trivy.
+- Emits Docker images uncompressed size.
+- Extracts the SBOM (Software Bill of Materials) from Docker images.
 - Provides real-time logging of the scanning process.
 - Easily integrates with Docker registries and catalogs.
 - Modular workers for pulling, scanning, and pushing images, including SBOM extraction and size calculations.

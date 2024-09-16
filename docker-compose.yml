@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 networks:
   trivy-net:
@@ -95,4 +95,17 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6380
 
-
+  sbomworker:
+    build:
+      context: .
+      dockerfile: ./build/Dockerfile-sbomworker
+    networks:
+      - trivy-net
+    volumes:
+      - ./images:/app/images
+      - ./trivy-reports:/app/reports
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6380
